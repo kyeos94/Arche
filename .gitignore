@@ -1,0 +1,27 @@
+# Gradle / Java
+backend/.gradle/
+backend/build/
+backend/bin/
+*.class
+hs_err_pid*
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Claude Code local settings
+.claude/settings.local.json
