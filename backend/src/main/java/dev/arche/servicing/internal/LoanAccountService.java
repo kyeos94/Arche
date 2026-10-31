@@ -270,6 +270,68 @@ class LoanAccountService implements LoanAccounts {
 		return ref(a);
 	}
 
+	// ------------------------------------------------------------------ 채무조정 (R9·R23)
+
+	static final int MAX_WORKOUT_INSTALLMENTS = 60;
+
+	record WorkoutCommand(Money waiveLate, Money waiveNormal, Money waivePrincipal, int installments, int dueDay,
+			String reason) {
+	}
+
+	/**
+	 * 채무조정 체결. 업무일자가 체결일이며, 미감면 이자·비용은 같은 날 입금으로 먼저 받아 둬야 한다.
+	 * 재생 결과 체결되지 않으면 예외로 트랜잭션 전체를 되돌린다 (R23).
+	 */
+	@Transactional
+	AccountRef workout(long accountId, WorkoutCommand c) {
+		LoanAccount a = lock(accountId);
+		requireChangeable(a);
+		if (a.repaymentMethod() == RepaymentMethod.ACQUIRED) {
+			throw new BusinessException("WORKOUT_INVALID", "매입채권 채무조정은 범위 밖입니다");
+		}
+		validateWorkout(c);
+		LocalDate today = businessDates.today();
+		AccountEvent event = events.save(AccountEvent.workout(accountId, today, c.waiveLate(), c.waiveNormal(),
+				c.waivePrincipal(), c.installments(), c.dueDay(), c.reason()));
+		events.flush();
+		AccountReplayer.Outcome o = replayer.replay(a, replayer.terms(a), replayAsOf(a), today, null);
+		dev.arche.servicing.engine.WorkoutView result = o.result().workouts().stream()
+				.filter(w -> w.ref().equals(event.ref())).findFirst().orElseThrow();
+		if (!result.concluded()) {
+			throw new BusinessException("WORKOUT_UNPAID",
+					"미감면 이자·비용 " + result.requiredPayment() + "을 오늘 먼저 입금해야 체결됩니다 (R23)");
+		}
+		LocalDate firstDue = ScheduleMath.firstDueDate(today, c.dueDay());
+		List<DueDayTerm> history = dueDayTerms.findByAccountIdOrderByValidFrom(accountId);
+		DueDayTerm current = history.getLast();
+		if (current.dueDay() != c.dueDay()) {
+			current.closeAt(firstDue);
+			dueDayTerms.saveAndFlush(current);
+			dueDayTerms.save(new DueDayTerm(accountId, c.dueDay(), firstDue, today, "채무조정", OffsetDateTime.now(clock)));
+		}
+		return ref(a);
+	}
+
+	static void validateWorkout(WorkoutCommand c) {
+		if (c.installments() < 1 || c.installments() > MAX_WORKOUT_INSTALLMENTS) {
+			throw new BusinessException("WORKOUT_INVALID", "분할은 1~" + MAX_WORKOUT_INSTALLMENTS + "회입니다");
+		}
+		if (!DUE_DAYS.contains(c.dueDay())) {
+			throw new BusinessException("DUE_DAY_INVALID", "약정일은 5·10·15·20·25일 중에서 고릅니다");
+		}
+		if (c.waiveLate().isNegative() || c.waiveNormal().isNegative() || c.waivePrincipal().isNegative()) {
+			throw new BusinessException("WORKOUT_INVALID", "감면액은 0 이상이어야 합니다");
+		}
+		if (c.reason() == null || c.reason().isBlank()) {
+			throw new BusinessException("REASON_REQUIRED", "채무조정 사유를 입력하세요");
+		}
+	}
+
+	private LocalDate replayAsOf(LoanAccount a) {
+		LocalDate today = businessDates.today();
+		return a.asOf() != null && a.asOf().isAfter(today) ? a.asOf() : today;
+	}
+
 	@Transactional
 	AccountRef chargeCost(long accountId, Money amount, String reason) {
 		LoanAccount a = lock(accountId);

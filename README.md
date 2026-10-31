@@ -48,7 +48,7 @@ cd frontend && npm ci && npm run dev      # http://localhost:5173
 
 | 계약 | 내용 | 화면에서 해 볼 것 |
 | --- | --- | --- |
-| A 홍길동 (P3, G2 조건) | 1회차만 납부 → 연체 18일 | 미확인 입금(05-26, 1,135,616원)을 A에 매칭 → 정상 (**G11**). 그 입금을 삭제 → 연체 부활 (**G27**) |
+| A 홍길동 (P3, G2 조건) | 1회차만 납부 → 연체 18일 | 미확인 입금(05-26, 1,135,616원)을 A에 매칭 → 정상 (**G11**). 그 입금을 삭제 → 연체 부활 (**G27**). 연체 상태에서 채무조정 견적 → 미감면 이자 입금 → 체결 (**G23**) |
 | B 김철수 (P5) | 잔액 3,000,000원 | A의 입금을 B로 정정 이동 → 이자 9,616원, 원금 1,126,000원 충당 (**G28**) |
 | C 이영희 (P1, G1 조건) | 5회차까지 정상 | 금리 인하(G24), 약정일 변경(G25), 일부 중도상환(G20) |
 | D 박민수 (P5, G15 조건) | 자유상환 | 수시 상환, 금액 오입력 당일 정정(G26) |
@@ -63,9 +63,9 @@ cd frontend && npm test
 ```
 
 - `GoldenScheduleTest`: [golden/schedules.csv](backend/src/test/resources/golden/schedules.csv) 65행(G1~G4, G20, G24, G25)을 회차 단위로 대조
-- `GoldenScenarioTest`·`PolicyRuleTest`: G5~G28, R3·R5·R29·R32·R33 등 정책 분기, 재생 결정성
+- `GoldenScenarioTest`·`PolicyRuleTest`: G5~G28, R3·R5·R9·R23·R29·R32·R33 등 정책 분기, 재생 결정성
 - `ArchitectureTest`: Spring Modulith 모듈 경계, 다른 모듈 Repository 참조 금지, `LocalDate.now()` 금지, double/float 금지, 엔진의 Spring·JPA 비의존
-- `SecurityIT`·`PaymentCorrectionIT`·`IntegrationFlowsIT`: 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단
+- `SecurityIT`·`PaymentCorrectionIT`·`WorkoutIT`·`IntegrationFlowsIT`: 채무조정 결재권·체결 거절(R23), 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단
 
 ## 진행 기록 — 무엇을 왜 이렇게 만들었나
 
@@ -79,7 +79,10 @@ cd frontend && npm test
    엔진 입력으로 넣고, 재생 결과 사유가 없어지면 REVOKED(R5), 과거에 생겼어야 할 새 사유는 처리일로 미룬다(R29).
 4. **모듈 경계** — servicing은 payment의 입금 테이블을 읽지 않고 자기 `account_event`에 재생 입력을 보관한다. 신청→계약은 Modulith 이벤트
    발행 기록(Outbox)으로 잇는다. 경계는 `ApplicationModules.verify()`와 ArchUnit이 검사한다.
-5. **권한표를 코드 행렬로** ([ADR 0004](docs/adr/0004-security.md)) — 정책서 9.1 표를 `Permission` enum으로 옮기고, 표 자체를 테스트 데이터로 대조한다.
+5. **채무조정도 재생 이벤트로** (G23) — 체결일까지 이자를 확정해 감면하고, 그날 받은 입금으로 미감면 이자가 다 채워지면 조정 원금으로
+   원리금균등 스케줄을 새로 만든다. 못 채우면 체결하지 않고(R23) API가 트랜잭션째 되돌린다. 조정 후 3회차 연속 미납이면 감면액을
+   ADJUSTMENT 거래로 되살리고 기한이익상실로 복귀한다(R9). 감면 항목별 결재권(연체이자 담당자, 정상이자 팀장, 원금 본부장)은 API에서 검사한다.
+6. **권한표를 코드 행렬로** ([ADR 0004](docs/adr/0004-security.md)) — 정책서 9.1 표를 `Permission` enum으로 옮기고, 표 자체를 테스트 데이터로 대조한다.
 
 ## 확장 지점 (범위 밖)
 
@@ -95,5 +98,5 @@ cd frontend && npm test
 | 보고서(일보 상세, 연체 전이율, 대손충당금), 회계 분개 | reporting 모듈 + JournalMapper |
 | 심사 상세(서류 징구, 자동 거절 규칙, 중개수수료 정산), 플랫폼 접수 | origination 모듈 |
 | 수기 조정 거래, 상계, 완제·매각 후 취소(상태 되돌리기) | 원장 ADJUSTMENT 거래 + 결재 |
-| 채무조정(G23), 분할납부 약속 저장·알림(G19 판정 로직은 `PromiseTracker`) | collection·servicing (엔진에 조정 이벤트 추가) |
+| 분할납부 약속 저장·알림(G19 판정 로직은 `PromiseTracker`), 매입채권 채무조정·조정 완제 | collection·servicing |
 | 대량 일마감 성능 | 마지막 마감 스냅샷부터 재생 |

@@ -18,7 +18,7 @@ import java.time.LocalDate;
 class AccountEvent extends BaseEntity {
 
 	enum Type {
-		PAYMENT, PREPAYMENT_REQUEST, DUE_DAY_CHANGE, COST_CHARGE
+		PAYMENT, PREPAYMENT_REQUEST, DUE_DAY_CHANGE, COST_CHARGE, WORKOUT
 	}
 
 	private long accountId;
@@ -31,6 +31,10 @@ class AccountEvent extends BaseEntity {
 	private String status;
 	private LocalDate cancelledOn;
 	private String reason;
+	private Long waiveLate;
+	private Long waiveNormal;
+	private Long waivePrincipal;
+	private Integer installments;
 
 	protected AccountEvent() {
 	}
@@ -65,6 +69,17 @@ class AccountEvent extends BaseEntity {
 		return new AccountEvent(accountId, Type.COST_CHARGE, on, amount.won(), null, null, reason);
 	}
 
+	/** 채무조정 체결 (R9). newDueDay = 재약정 약정일, installments = 재약정 회차 수 */
+	static AccountEvent workout(long accountId, LocalDate on, Money waiveLate, Money waiveNormal, Money waivePrincipal,
+			int installments, int dueDay, String reason) {
+		AccountEvent e = new AccountEvent(accountId, Type.WORKOUT, on, null, dueDay, null, reason);
+		e.waiveLate = waiveLate.won();
+		e.waiveNormal = waiveNormal.won();
+		e.waivePrincipal = waivePrincipal.won();
+		e.installments = installments;
+		return e;
+	}
+
 	String ref() {
 		return "EV-" + getId();
 	}
@@ -76,6 +91,8 @@ class AccountEvent extends BaseEntity {
 					amount == null ? null : Money.won(amount));
 			case DUE_DAY_CHANGE -> new LoanEvent.DueDayChange(ref(), eventDate, newDueDay);
 			case COST_CHARGE -> new LoanEvent.CostCharge(ref(), eventDate, Money.won(amount));
+			case WORKOUT -> new LoanEvent.Workout(ref(), eventDate, Money.won(waiveLate), Money.won(waiveNormal),
+					Money.won(waivePrincipal), installments, newDueDay);
 		};
 	}
 
@@ -119,5 +136,21 @@ class AccountEvent extends BaseEntity {
 
 	String reason() {
 		return reason;
+	}
+
+	Long waiveLate() {
+		return waiveLate;
+	}
+
+	Long waiveNormal() {
+		return waiveNormal;
+	}
+
+	Long waivePrincipal() {
+		return waivePrincipal;
+	}
+
+	Integer installments() {
+		return installments;
 	}
 }

@@ -287,6 +287,84 @@ class GoldenScenarioTest {
 		assertThat(paid.refundPending()).isEqualTo(Money.ZERO);
 	}
 
+	static LoanEvent.Workout g23Workout() {
+		return new LoanEvent.Workout("WORKOUT", parse("2026-09-01"), won(21_204), Money.ZERO, Money.ZERO, 24, 25);
+	}
+
+	/** G8 상태(2회차까지 납부, 08-13 상실) + 09-01 정상이자 납부 + 채무조정 */
+	static List<LoanEvent> g23Events() {
+		return concat(payScheduled(G2, 2), List.of(pay("G23-PAY", "2026-09-01", 406_849), g23Workout()));
+	}
+
+	@Nested
+	@DisplayName("G23 채무조정 (G8 대출, R9·R23)")
+	class G23 {
+
+		@Test
+		void 가산이자_감면_정상이자_체결일_납부_24회_재약정() {
+			var r = simulate(G2, g23Events(), "2026-09-01");
+
+			Posting waiver = posting(r, "WORKOUT");
+			assertThat(waiver.type()).isEqualTo(PostingType.WAIVER);
+			assertThat(waiver.lateInterest()).isEqualTo(won(2_465 + 3_123 + 15_616));
+			assertThat(waiver.normalAccrued()).isEqualTo(won(406_849));
+			assertThat(posting(r, "G23-PAY").normalInterest()).isEqualTo(won(406_849));
+
+			assertThat(r.status()).isEqualTo(AccountStatus.WORKOUT);
+			assertThat(r.principalBalance()).isEqualTo(won(10_000_000));
+			assertThat(r.installmentAmount()).isEqualTo(won(484_866));
+			assertThat(r.installments()).hasSize(24);
+			assertThat(r.installments().stream().map(Installment::plannedInterest).reduce(Money.ZERO, Money::plus))
+					.isEqualTo(won(1_767_082));
+			assertThat(r.workouts()).singleElement().satisfies(w -> {
+				assertThat(w.concluded()).isTrue();
+				assertThat(w.requiredPayment()).isEqualTo(won(406_849));
+			});
+			assertThat(r.outstandingLateInterest()).isEqualTo(Money.ZERO);
+			assertThat(r.outstandingNormalInterest()).isEqualTo(Money.ZERO);
+		}
+
+		@Test
+		void R23_미감면_이자를_체결일에_받지_못하면_체결하지_않는다() {
+			var r = simulate(G2, concat(payScheduled(G2, 2),
+					List.of(pay("SHORT", "2026-09-01", 100_000), g23Workout())), "2026-09-01");
+
+			assertThat(r.workouts()).singleElement().extracting(WorkoutView::concluded).isEqualTo(false);
+			assertThat(r.status()).isEqualTo(AccountStatus.ACCELERATED);
+			// 감면액은 되살아나고, 받은 돈은 이자에 충당된 채로 남는다
+			assertThat(r.unpaidLateInterest()).isEqualTo(won(21_204));
+			assertThat(r.unpaidNormalInterest()).isEqualTo(won(406_849 - 100_000));
+			assertThat(r.warnings()).anyMatch(w -> w.contains("R23"));
+		}
+
+		@Test
+		void R9_조정_후_3회차_연속_미납이면_감면액을_되살리고_상실로_복귀() {
+			// 1회차 10-25(일 → 유예 10-26), 2회차 11-25, 3회차 12-25(공휴일 → 유예 12-28) 모두 미납 → 12-29 복귀
+			var two = simulate(G2, g23Events(), "2026-12-28");
+			assertThat(two.status()).isEqualTo(AccountStatus.WORKOUT);
+			assertThat(two.notices()).noneMatch(n -> n.reasonDate().isAfter(parse("2026-09-01")));
+
+			var r = simulate(G2, g23Events(), "2026-12-29");
+			assertThat(r.status()).isEqualTo(AccountStatus.ACCELERATED);
+			assertThat(r.acceleratedOn()).isEqualTo(parse("2026-12-29"));
+			assertThat(r.workouts().getFirst().restoredOn()).isEqualTo(parse("2026-12-29"));
+			assertThat(r.unpaidLateInterest()).isEqualTo(won(21_204));
+			assertThat(posting(r, "WORKOUT-RESTORE").type()).isEqualTo(PostingType.ADJUSTMENT);
+		}
+
+		@Test
+		void 조정_회차를_내면_상실로_돌아가지_않는다() {
+			var plan = simulate(G2, g23Events(), "2026-09-01");
+			var paid = new java.util.ArrayList<LoanEvent>(g23Events());
+			for (Installment i : plan.installments().subList(0, 3)) {
+				paid.add(pay("W-" + i.seq(), i.dueDate().toString(), i.plannedPayment().won()));
+			}
+			var r = simulate(G2, paid, "2027-01-10");
+			assertThat(r.status()).isEqualTo(AccountStatus.WORKOUT);
+			assertThat(r.principalBalance()).isEqualTo(won(10_000_000 - 262_949 - 360_819 - 369_269));
+		}
+	}
+
 	@Test
 	void G24_금리_변경_회차_이자_구간_합산() {
 		var r = simulate(G1.withRatePeriods(List.of(new RatePeriod(parse("2026-01-10"), InterestRate.of("19.9")),

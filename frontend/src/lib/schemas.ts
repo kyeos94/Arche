@@ -62,6 +62,22 @@ export const rateChangeSchema = z.object({
 
 export const dueDayChangeSchema = z.object({ dueDay, reason })
 
+/** 감면액: 비워 두면 0 */
+const waiver = z
+  .union([z.string(), z.number()])
+  .transform((v) => (typeof v === 'number' ? v : Number(v.replace(/[^0-9]/g, '') || '0')))
+  .pipe(z.number().int().min(0, '0 이상이어야 합니다'))
+
+/** 채무조정 (R9): 분할 최대 60회 */
+export const workoutSchema = z.object({
+  waiveLate: waiver,
+  waiveNormal: waiver,
+  waivePrincipal: waiver,
+  installments: z.coerce.number().int().min(1, '1회 이상').max(60, '분할은 최대 60회입니다'),
+  dueDay,
+  reason,
+})
+
 export const correctionSchema = z
   .object({
     type: z.enum(['CANCEL', 'MOVE', 'AMOUNT_FIX']),

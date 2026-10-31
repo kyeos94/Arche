@@ -13,9 +13,12 @@ import dev.arche.servicing.AccountRef;
 import dev.arche.servicing.LoanAccounts;
 import dev.arche.servicing.engine.AccountStatus;
 import dev.arche.servicing.engine.LimitationPeriod;
+import dev.arche.servicing.engine.LoanEvent;
 import dev.arche.servicing.engine.ScheduleMath;
 import dev.arche.servicing.engine.SimulationResult;
 import dev.arche.staff.DataScope;
+import dev.arche.staff.CurrentStaff;
+import dev.arche.staff.Permission;
 import dev.arche.staff.StaffDirectory;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -110,7 +113,16 @@ class LoanController {
 
 	record EventDto(long id, String ref, String type, LocalDate eventDate, Long amount, Integer newDueDay,
 			Long paymentId, String status, LocalDate cancelledOn, String reason, String createdBy,
-			OffsetDateTime createdAt) {
+			OffsetDateTime createdAt, Long waiveLate, Long waiveNormal, Long waivePrincipal, Integer installments) {
+	}
+
+	record WorkoutRequest(long waiveLate, long waiveNormal, long waivePrincipal, int installments, int dueDay,
+			@NotBlank String reason) {
+	}
+
+	record WorkoutQuote(LocalDate date, long cost, long lateInterest, long normalInterest, long principal,
+			long waiveLate, long waiveNormal, long waivePrincipal, long requiredPayment, long paidToday,
+			long remainingPayment, long newPrincipal, Long installmentAmount, List<InstallmentDto> schedulePreview) {
 	}
 
 	record History(List<RateTermDto> rateTerms, List<DueDayTermDto> dueDayTerms, List<NoticeDto> notices,
@@ -329,7 +341,8 @@ class LoanController {
 						.toList(),
 				events.findByAccountIdOrderById(id).stream().map(e -> new EventDto(e.getId(), e.ref(),
 						e.type().name(), e.eventDate(), e.amount(), e.newDueDay(), e.paymentId(), e.status(),
-						e.cancelledOn(), e.reason(), e.getCreatedBy(), e.getCreatedAt())).toList());
+						e.cancelledOn(), e.reason(), e.getCreatedBy(), e.getCreatedAt(), e.waiveLate(), e.waiveNormal(),
+						e.waivePrincipal(), e.installments())).toList());
 	}
 
 	/** 업무일자 기준 중도상환·완제 견적 (R7·R8). principal을 비우면 전액 */
@@ -356,6 +369,63 @@ class LoanController {
 		long total = Math.max(0, r.cost().won() + late + interest + principalPart + fee.won() - r.suspense().won());
 		return new Quote(today, r.cost().won(), late, interest, full ? 0 : overdue, p.won(), fee.won(),
 				r.suspense().won(), total, full);
+	}
+
+	// ------------------------------------------------------------------ 채무조정 (R9·R23, G23)
+
+	/** 채무조정 견적: 감면 후 체결일에 받아야 할 금액과 새 스케줄 미리보기 */
+	@GetMapping("/{id}/workout-quote")
+	@PreAuthorize("hasAnyAuthority('workout.waive.late', 'workout.waive.normal', 'workout.waive.principal')")
+	@Transactional(readOnly = true)
+	WorkoutQuote workoutQuote(@PathVariable long id, @RequestParam(defaultValue = "0") long waiveLate,
+			@RequestParam(defaultValue = "0") long waiveNormal, @RequestParam(defaultValue = "0") long waivePrincipal,
+			@RequestParam(defaultValue = "24") int installments, @RequestParam(defaultValue = "25") int dueDay) {
+		LoanAccount a = visible(id);
+		LoanAccountService.validateWorkout(new LoanAccountService.WorkoutCommand(Money.won(waiveLate),
+				Money.won(waiveNormal), Money.won(waivePrincipal), installments, dueDay, "견적"));
+		LocalDate today = businessDates.today();
+		var terms = replayer.terms(a);
+		SimulationResult now = replayer.simulate(a, terms, List.of(), today);
+		var workout = new LoanEvent.Workout("QUOTE", today, Money.won(waiveLate), Money.won(waiveNormal),
+				Money.won(waivePrincipal), installments, dueDay);
+		var planned = replayer.simulate(a, terms, List.of(workout), today).workouts().getLast();
+		long paidToday = events.findByAccountIdOrderById(id).stream()
+				.filter(e -> e.active() && e.type() == AccountEvent.Type.PAYMENT && e.eventDate().equals(today))
+				.mapToLong(AccountEvent::amount).sum();
+		long remaining = Math.max(0, planned.requiredPayment().won() - paidToday);
+		List<LoanEvent> preview = remaining > 0
+				? List.of(workout, new LoanEvent.Payment("QUOTE-PAY", today, Money.won(remaining)))
+				: List.of(workout);
+		SimulationResult after = replayer.simulate(a, terms, preview, today);
+		boolean concluded = after.workouts().getLast().concluded();
+		return new WorkoutQuote(today, now.cost().won(), now.outstandingLateInterest().won(),
+				now.outstandingNormalInterest().won(), now.principalBalance().won(), planned.waivedLate().won(),
+				planned.waivedNormal().won(), planned.waivedPrincipal().won(), planned.requiredPayment().won(),
+				paidToday, remaining, now.principalBalance().won() - planned.waivedPrincipal().won(),
+				concluded && after.installmentAmount() != null ? after.installmentAmount().won() : null,
+				concluded ? after.installments().stream().map(i -> new InstallmentDto(i.scheduleVersion(), i.seq(),
+						i.periodStart(), i.dueDate(), i.graceEnd(), i.principalDue().won(), i.plannedInterest().won(),
+						i.plannedPayment().won(), i.principalPaid().won(), i.status().name())).toList() : List.of());
+	}
+
+	/** 채무조정 체결. 감면 항목별 결재권: 연체이자 채권담당 / 정상이자 채권팀장 / 원금 본부장 (정책서 5장, 9.1) */
+	@PostMapping("/{id}/workouts")
+	@PreAuthorize("hasAnyAuthority('workout.waive.late', 'workout.waive.normal', 'workout.waive.principal')")
+	AccountRef workout(@PathVariable long id, @Valid @RequestBody WorkoutRequest body) {
+		visibleInTx(id);
+		CurrentStaff me = staff.current();
+		requireIf(body.waiveLate() > 0, me, Permission.WORKOUT_LATE_INTEREST, "연체이자");
+		requireIf(body.waiveNormal() > 0, me, Permission.WORKOUT_NORMAL_INTEREST, "정상이자");
+		requireIf(body.waivePrincipal() > 0, me, Permission.WORKOUT_PRINCIPAL, "원금");
+		return service.workout(id, new LoanAccountService.WorkoutCommand(Money.won(body.waiveLate()),
+				Money.won(body.waiveNormal()), Money.won(body.waivePrincipal()), body.installments(), body.dueDay(),
+				body.reason()));
+	}
+
+	private static void requireIf(boolean needed, CurrentStaff me, Permission p, String what) {
+		if (needed && !me.has(p)) {
+			throw new BusinessException("FORBIDDEN", what + " 감면 결재 권한이 없습니다");
+		}
 	}
 
 	// ------------------------------------------------------------------ 변경

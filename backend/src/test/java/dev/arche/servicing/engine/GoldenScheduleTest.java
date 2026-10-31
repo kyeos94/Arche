@@ -40,7 +40,9 @@ class GoldenScheduleTest {
 					concat(payScheduled(G1, 5), List.of(pay("INST-6", "2026-07-10", 920_880))), "2026-07-10"),
 			// 07-15에 약정일 10일 → 25일 변경 신청 (R21), 7회차까지 납부
 			"G25", () -> simulate(G1, concat(payScheduled(G1, 7),
-					List.of(new LoanEvent.DueDayChange("DUE", parse("2026-07-15"), 25))), "2026-08-10"));
+					List.of(new LoanEvent.DueDayChange("DUE", parse("2026-07-15"), 25))), "2026-08-10"),
+			// G8 상태에서 09-01 채무조정: 가산이자 전액 감면, 정상이자 체결일 납부, 24회 원리금균등 (R9)
+			"G23", () -> simulate(Golden.G2, GoldenScenarioTest.g23Events(), "2026-09-01"));
 
 	private static final Map<String, SimulationResult> CACHE = new ConcurrentHashMap<>();
 

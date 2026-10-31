@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Can } from '@/features/auth/auth'
 import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
-import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog } from './dialogs'
+import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
 import { HistoryTab, LedgerTab, ScheduleTab } from './tabs'
 
@@ -96,6 +96,9 @@ export function LoanDetailPage() {
                 <DueDayChangeDialog loan={loan} />
               </>
             )}
+          </Can>
+          <Can permission="workout.waive.late">
+            {open && loan.repaymentMethod !== 'ACQUIRED' && <WorkoutDialog loan={loan} />}
           </Can>
           <Can permission="customer.id.reveal">
             <RevealDialog loan={loan} />

@@ -187,6 +187,33 @@ export interface History {
   }[]
 }
 
+/** 채무조정 견적 (R9·R23) */
+export interface WorkoutQuote {
+  date: string
+  cost: number
+  lateInterest: number
+  normalInterest: number
+  principal: number
+  waiveLate: number
+  waiveNormal: number
+  waivePrincipal: number
+  requiredPayment: number
+  paidToday: number
+  remainingPayment: number
+  newPrincipal: number
+  installmentAmount: number | null
+  schedulePreview: InstallmentDto[]
+}
+
+export interface WorkoutRequest {
+  waiveLate: number
+  waiveNormal: number
+  waivePrincipal: number
+  installments: number
+  dueDay: number
+  reason: string
+}
+
 export interface Quote {
   date: string
   cost: number

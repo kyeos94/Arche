@@ -13,6 +13,10 @@ public enum PostingType {
 	SUSPENSE_APPLY,
 	/** 중도상환 (원금 + 수수료) */
 	PREPAYMENT,
+	/** 채무조정 감면 (금액 = 줄어든 이자·원금) */
+	WAIVER,
+	/** 채무조정 미체결·실패로 감면액 부활 (금액은 음수) */
+	ADJUSTMENT,
 	/** 완제 후 남은 금액 반환 대기 */
 	REFUND
 }

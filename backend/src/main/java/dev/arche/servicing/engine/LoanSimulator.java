@@ -125,7 +125,8 @@ public final class LoanSimulator {
 	private final class Run {
 
 		private final LoanTerms terms;
-		private final RepaymentMethod method;
+		/** 채무조정 체결 후에는 원리금균등으로 바뀐다 */
+		private RepaymentMethod method;
 		private final Options options;
 
 		private final List<LoanEvent.Payment> payments = new ArrayList<>();
@@ -161,6 +162,13 @@ public final class LoanSimulator {
 		private final List<Posting> postings = new ArrayList<>();
 		private final List<String> warnings = new ArrayList<>();
 
+		private final List<LoanEvent.Workout> workoutEvents = new ArrayList<>();
+		private final List<WorkoutState> workouts = new ArrayList<>();
+		/** 체결일 당일, 미감면 이자 납부를 기다리는 채무조정 */
+		private @Nullable WorkoutState pendingWorkout;
+		/** 체결된 채무조정 (3회차 연속 미납 시 감면액 부활 대상) */
+		private @Nullable WorkoutState activeWorkout;
+
 		Run(LoanTerms terms, List<LoanEvent> events, Options options) {
 			this.terms = terms;
 			this.method = terms.method();
@@ -175,6 +183,7 @@ public final class LoanSimulator {
 					case LoanEvent.PrepaymentRequest p -> prepayments.add(p);
 					case LoanEvent.DueDayChange c -> dueDayChanges.add(c);
 					case LoanEvent.CostCharge c -> costs.add(c);
+					case LoanEvent.Workout w -> workoutEvents.add(w);
 				}
 			}
 			for (RatePeriod p : terms.ratePeriods()) {
@@ -304,13 +313,20 @@ public final class LoanSimulator {
 					post(d, PostingType.COST_CHARGE, c.ref(), c.amount()).add();
 				}
 			}
+			for (LoanEvent.Workout w : workoutEvents) {
+				if (w.contractedOn().equals(d)) {
+					beginWorkout(d, w);
+				}
+			}
 			for (LoanEvent.Payment p : payments) {
 				if (!processedPayments.contains(p.ref()) && valueDate(p.bankDate()).equals(d)) {
 					processedPayments.add(p.ref());
 					receive(d, p);
 				}
 			}
-			if (paidOffOn == null && !accelerated && !method.settlesOnPayment() && suspense.isPositive()
+			if (pendingWorkout != null) {
+				concludeWorkout(d);
+			} else if (paidOffOn == null && !accelerated && !method.settlesOnPayment() && suspense.isPositive()
 					&& schedule.stream().anyMatch(i -> i.dueDate.equals(d))) {
 				allocate(d, suspense, false, PostingType.SUSPENSE_APPLY, "DUE-" + d, true);
 			}
@@ -354,8 +370,12 @@ public final class LoanSimulator {
 					accelerate(d);
 				}
 			}
-			if (active == null && !accelerated && paidOffOn == null && method != RepaymentMethod.ACQUIRED
-					&& !matured(d) && reasonExists(d)) {
+			if (activeWorkout != null && !accelerated && paidOffOn == null && consecutiveUnresolved(3)) {
+				restoreWorkout(d);
+			}
+			// 채무조정 중에는 R4 대신 R9(3회차 연속 미납 → 상실 복귀)를 적용한다
+			if (active == null && !accelerated && activeWorkout == null && paidOffOn == null
+					&& method != RepaymentMethod.ACQUIRED && !matured(d) && reasonExists(d)) {
 				KnownNotice known = unusedKnown.stream().filter(k -> k.reasonDate().equals(d)).findFirst()
 						.orElse(null);
 				boolean knownLater = unusedKnown.stream().anyMatch(k -> k.reasonDate().isAfter(d));
@@ -486,6 +506,11 @@ public final class LoanSimulator {
 				post(d, PostingType.REFUND, p.ref(), p.amount()).refund(p.amount()).add();
 				return;
 			}
+			if (pendingWorkout != null) {
+				// 채무조정 체결일 입금은 미감면 이자·비용부터 받고, 남는 돈은 가수금 (R23)
+				allocate(d, p.amount(), false, PostingType.REPAYMENT, p.ref(), false, true);
+				return;
+			}
 			boolean dueAll = method.settlesOnPayment() || accelerated || matured(d);
 			if (dueAll || delinquent()) {
 				allocate(d, p.amount(), dueAll, PostingType.REPAYMENT, p.ref(), false);
@@ -502,6 +527,11 @@ public final class LoanSimulator {
 		 */
 		private void allocate(LocalDate d, Money cash, boolean principalAll, PostingType type, String ref,
 				boolean fromSuspense) {
+			allocate(d, cash, principalAll, type, ref, fromSuspense, false);
+		}
+
+		private void allocate(LocalDate d, Money cash, boolean principalAll, PostingType type, String ref,
+				boolean fromSuspense, boolean interestOnly) {
 			Settled s = settle(d);
 			Waterfall pot = new Waterfall(cash);
 			Money paidCost = pot.take(cost);
@@ -516,7 +546,7 @@ public final class LoanSimulator {
 			List<Posting.InstallmentAllocation> allocations = new ArrayList<>();
 			Money paidPrincipal = Money.ZERO;
 			for (Inst i : schedule) {
-				if (pot.left().isZero()) {
+				if (pot.left().isZero() || interestOnly) {
 					break;
 				}
 				if ((principalAll || !i.dueDate.isAfter(d)) && i.unpaid().isPositive()) {
@@ -642,6 +672,118 @@ public final class LoanSimulator {
 				}
 			}
 			return Money.won(lo);
+		}
+
+		// ---------------------------------------------------------------- 채무조정 (R9·R23)
+
+		private final class WorkoutState {
+			final LoanEvent.Workout event;
+			Money waivedLate = Money.ZERO;
+			Money waivedNormal = Money.ZERO;
+			Money waivedPrincipal = Money.ZERO;
+			Money required = Money.ZERO;
+			boolean concluded;
+			@Nullable LocalDate restoredOn;
+
+			WorkoutState(LoanEvent.Workout event) {
+				this.event = event;
+			}
+
+			WorkoutView view() {
+				return new WorkoutView(event.ref(), event.contractedOn(), concluded, waivedLate, waivedNormal,
+						waivedPrincipal, required, restoredOn);
+			}
+		}
+
+		/** 체결일까지 이자 확정 → 감면 (미납액을 넘는 감면은 미납액까지만) */
+		private void beginWorkout(LocalDate d, LoanEvent.Workout w) {
+			WorkoutState ws = new WorkoutState(w);
+			workouts.add(ws);
+			if (paidOffOn != null || method == RepaymentMethod.ACQUIRED || pendingWorkout != null) {
+				warnings.add(w.ref() + ": 채무조정을 체결할 수 없는 상태 (완제·매입채권)");
+				return;
+			}
+			Settled s = settle(d);
+			ws.waivedLate = w.waiveLate().min(unpaidLate);
+			ws.waivedNormal = w.waiveNormal().min(unpaidNormal);
+			ws.waivedPrincipal = w.waivePrincipal().min(principal);
+			unpaidLate = unpaidLate.minus(ws.waivedLate);
+			unpaidNormal = unpaidNormal.minus(ws.waivedNormal);
+			principal = principal.minus(ws.waivedPrincipal);
+			ws.required = unpaidLate.plus(unpaidNormal).plus(cost).minus(suspense).max(Money.ZERO);
+			post(d, PostingType.WAIVER, w.ref(), ws.waivedLate.plus(ws.waivedNormal).plus(ws.waivedPrincipal))
+					.principal(ws.waivedPrincipal).normal(ws.waivedNormal).late(ws.waivedLate)
+					.accrued(s.normal(), s.late()).add();
+			pendingWorkout = ws;
+			if (suspense.isPositive()) {
+				allocate(d, suspense, false, PostingType.SUSPENSE_APPLY, w.ref() + "-SUSPENSE", true, true);
+			}
+		}
+
+		/** 체결일 입금을 받은 뒤: 미감면 이자·비용을 다 받았으면 새 스케줄, 아니면 체결하지 않음 (R23) */
+		private void concludeWorkout(LocalDate d) {
+			WorkoutState ws = pendingWorkout;
+			pendingWorkout = null;
+			LoanEvent.Workout w = ws.event;
+			if (!unpaidLate.isZero() || !unpaidNormal.isZero() || !cost.isZero()) {
+				unpaidLate = unpaidLate.plus(ws.waivedLate);
+				unpaidNormal = unpaidNormal.plus(ws.waivedNormal);
+				principal = principal.plus(ws.waivedPrincipal);
+				post(d, PostingType.ADJUSTMENT, w.ref() + "-UNPAID",
+						Money.ZERO.minus(ws.waivedLate.plus(ws.waivedNormal).plus(ws.waivedPrincipal)))
+						.principal(Money.ZERO.minus(ws.waivedPrincipal)).normal(Money.ZERO.minus(ws.waivedNormal))
+						.late(Money.ZERO.minus(ws.waivedLate)).add();
+				warnings.add(w.ref() + ": 미감면 이자 " + ws.required + "을 체결일에 받지 못해 채무조정을 체결하지 않음 (R23)");
+				return;
+			}
+			ws.concluded = true;
+			if (active != null) {
+				active.status = NoticeStatus.CANCELLED;
+				active.closedOn = d;
+				active = null;
+			}
+			accelerated = false;
+			acceleratedOn = null;
+			method = RepaymentMethod.EQUAL_INSTALLMENT;
+			for (Inst i : schedule) {
+				previousVersions.add(view(i, InstallmentStatus.REPLACED));
+			}
+			List<Integer> seqs = new ArrayList<>();
+			for (int i = 1; i <= w.installments(); i++) {
+				seqs.add(i);
+			}
+			annuity = ScheduleMath.annuity(principal, terms.rateAt(d), w.installments());
+			schedule = plan(seqs, ScheduleMath.monthlyDueDates(ScheduleMath.firstDueDate(d, w.dueDay()), w.dueDay(),
+					w.installments()), d, principal, 0, annuity, terms::rateAt, null);
+			scheduleVersion++;
+			activeWorkout = ws;
+			checkPaidOff(d);
+		}
+
+		/** 조정 후 3회차 연속 미납: 감면액을 되살리고 기한이익상실 상태로 복귀 (R9) */
+		private void restoreWorkout(LocalDate d) {
+			WorkoutState ws = activeWorkout;
+			activeWorkout = null;
+			ws.restoredOn = d;
+			unpaidLate = unpaidLate.plus(ws.waivedLate);
+			unpaidNormal = unpaidNormal.plus(ws.waivedNormal);
+			principal = principal.plus(ws.waivedPrincipal);
+			post(d, PostingType.ADJUSTMENT, ws.event.ref() + "-RESTORE",
+					Money.ZERO.minus(ws.waivedLate.plus(ws.waivedNormal).plus(ws.waivedPrincipal)))
+					.principal(Money.ZERO.minus(ws.waivedPrincipal)).normal(Money.ZERO.minus(ws.waivedNormal))
+					.late(Money.ZERO.minus(ws.waivedLate)).add();
+			accelerate(d);
+		}
+
+		private boolean consecutiveUnresolved(int n) {
+			int run = 0;
+			for (Inst i : schedule) {
+				run = unresolved(i) ? run + 1 : 0;
+				if (run >= n) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		// ---------------------------------------------------------------- 조건 변경 (R20·R21)
@@ -826,12 +968,14 @@ public final class LoanSimulator {
 							.plus(principal).plus(feeToday).minus(suspense).max(Money.ZERO);
 			AccountStatus status = paidOffOn != null ? AccountStatus.PAID_OFF
 					: accelerated ? AccountStatus.ACCELERATED
-							: since != null ? AccountStatus.DELINQUENT : AccountStatus.NORMAL;
+							: activeWorkout != null ? AccountStatus.WORKOUT
+									: since != null ? AccountStatus.DELINQUENT : AccountStatus.NORMAL;
 			return new SimulationResult(asOf, status, principal, suspense, cost, preAcq, unpaidNormal, unpaidLate,
 					acc.normal(), acc.late(), lastSettled, since, acceleratedOn, maturity(), annuity, scheduleVersion,
 					schedule.stream().map(i -> view(i, null)).toList(), List.copyOf(previousVersions),
 					List.copyOf(postings), notices.stream().map(Notice::view).toList(), totalPaid, refundPending,
-					feeToday, payoff, paidOffOn, List.copyOf(warnings));
+					feeToday, payoff, paidOffOn, List.copyOf(warnings),
+					workouts.stream().map(WorkoutState::view).toList());
 		}
 	}
 }

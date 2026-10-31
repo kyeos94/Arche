@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { correctionSchema, dueDayChangeSchema, openLoanSchema, paymentSchema, rateChangeSchema } from './schemas'
+import { correctionSchema, dueDayChangeSchema, openLoanSchema, paymentSchema, rateChangeSchema, workoutSchema } from './schemas'
 
 describe('schemas', () => {
   it('약정일은 5·10·15·20·25일만', () => {
@@ -58,5 +58,18 @@ describe('schemas', () => {
       false,
     )
     expect(correctionSchema.safeParse({ type: 'CANCEL', reason: '' }).success).toBe(false)
+  })
+})
+
+describe('workoutSchema', () => {
+  const base = { waiveLate: '21,204', waiveNormal: '', waivePrincipal: '0', installments: '24', dueDay: '25', reason: '생계 곤란' }
+
+  it('감면액 쉼표 허용, 비우면 0', () => {
+    const v = workoutSchema.parse(base)
+    expect(v).toMatchObject({ waiveLate: 21204, waiveNormal: 0, waivePrincipal: 0, installments: 24, dueDay: 25 })
+  })
+
+  it('분할은 최대 60회 (R9)', () => {
+    expect(workoutSchema.safeParse({ ...base, installments: '61' }).success).toBe(false)
   })
 })

@@ -18,6 +18,8 @@ import type {
   PaymentView,
   Product,
   Quote,
+  WorkoutQuote,
+  WorkoutRequest,
   Schedule,
   StaffRow,
   UnmatchedDeposit,
@@ -35,6 +37,7 @@ export const queryKeys = {
   loanHistory: (id: number) => ['loan', id, 'history'] as const,
   loanPayments: (id: number) => ['loan', id, 'payments'] as const,
   quote: (id: number, principal: number | null) => ['loan', id, 'quote', principal] as const,
+  workoutQuote: (id: number, body: Omit<WorkoutRequest, 'reason'>) => ['loan', id, 'workout-quote', body] as const,
   unmatched: ['unmatched'] as const,
   corrections: (status: string) => ['corrections', status] as const,
   bulkJob: (id: number) => ['bulk', id] as const,
@@ -112,6 +115,9 @@ export const endpoints = {
     api.post<AccountRef>(`/api/loans/${id}/rate-changes`, body),
   changeDueDay: (id: number, body: { dueDay: number; reason: string }) =>
     api.post<AccountRef>(`/api/loans/${id}/due-day-changes`, body),
+  workoutQuote: (id: number, body: Omit<WorkoutRequest, 'reason'>) =>
+    api.get<WorkoutQuote>(`/api/loans/${id}/workout-quote${qs({ ...body })}`),
+  workout: (id: number, body: WorkoutRequest) => api.post<AccountRef>(`/api/loans/${id}/workouts`, body),
   openLoan: (body: OpenLoanRequest) => api.post<AccountRef>('/api/loans', body),
   products: () => api.get<Product[]>('/api/products'),
   registerCustomer: (body: NewCustomer) => api.post<CustomerView>('/api/customers', body),

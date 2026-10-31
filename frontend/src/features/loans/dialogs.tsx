@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
 import { formatMoney } from '@/lib/format'
-import { DUE_DAYS, dueDayChangeSchema, paymentSchema, rateChangeSchema } from '@/lib/schemas'
+import { DUE_DAYS, dueDayChangeSchema, paymentSchema, rateChangeSchema, workoutSchema } from '@/lib/schemas'
+import { useAuth } from '@/features/auth/auth'
 import { useInvalidateLoan } from './hooks'
 
 // ------------------------------------------------------------------ 입금 등록 (+ 중도상환)
@@ -221,6 +222,137 @@ export function DueDayChangeDialog({ loan }: { loan: LoanDetail }) {
           <DialogFooter>
             <Button type="submit" disabled={save.isPending}>
               변경
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ------------------------------------------------------------------ 채무조정 (R9·R23, G23)
+
+type WorkoutInput = z.input<typeof workoutSchema>
+type WorkoutOutput = z.output<typeof workoutSchema>
+
+export function WorkoutDialog({ loan }: { loan: LoanDetail }) {
+  const [open, setOpen] = useState(false)
+  const invalidate = useInvalidateLoan()
+  const { can } = useAuth()
+  const form = useForm<WorkoutInput, unknown, WorkoutOutput>({
+    resolver: zodResolver(workoutSchema),
+    defaultValues: {
+      waiveLate: String(loan.outstandingLateInterest),
+      waiveNormal: '0',
+      waivePrincipal: '0',
+      installments: 24,
+      dueDay: loan.currentDueDay ?? 25,
+      reason: '',
+    },
+  })
+  const values = form.watch()
+  const parsed = workoutSchema.omit({ reason: true }).safeParse(values)
+  const quote = useQuery({
+    queryKey: queryKeys.workoutQuote(loan.id, parsed.success ? parsed.data : ({} as never)),
+    queryFn: () => endpoints.workoutQuote(loan.id, parsed.data!),
+    enabled: open && parsed.success,
+  })
+  const save = useMutation({
+    mutationFn: (v: WorkoutOutput) => endpoints.workout(loan.id, v),
+    onSuccess: async () => {
+      await invalidate(loan.id)
+      setOpen(false)
+    },
+  })
+  const errors = form.formState.errors
+  const q = quote.data
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          채무조정
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title="채무조정 체결"
+        description="오늘까지 이자를 확정해 감면한 뒤 조정 원금으로 원리금균등 스케줄을 새로 만듭니다. 미감면 이자는 오늘 먼저 입금돼 있어야 체결됩니다 (R23). 조정 후 3회차 연속 미납이면 감면액이 되살아나고 기한이익상실로 돌아갑니다 (R9)."
+      >
+        <form className="space-y-3" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="연체이자 감면" htmlFor="waiveLate" error={errors.waiveLate?.message}>
+              <Input id="waiveLate" inputMode="numeric" {...form.register('waiveLate')} />
+            </Field>
+            <Field label="정상이자 감면 (팀장)" htmlFor="waiveNormal" error={errors.waiveNormal?.message}>
+              <Input
+                id="waiveNormal"
+                inputMode="numeric"
+                disabled={!can('workout.waive.normal')}
+                {...form.register('waiveNormal')}
+              />
+            </Field>
+            <Field label="원금 감면 (본부장)" htmlFor="waivePrincipal" error={errors.waivePrincipal?.message}>
+              <Input
+                id="waivePrincipal"
+                inputMode="numeric"
+                disabled={!can('workout.waive.principal')}
+                {...form.register('waivePrincipal')}
+              />
+            </Field>
+            <Field label="분할 회차 (최대 60)" htmlFor="installments" error={errors.installments?.message}>
+              <Input id="installments" type="number" {...form.register('installments')} />
+            </Field>
+            <Field label="약정일" htmlFor="workoutDueDay" error={errors.dueDay?.message}>
+              <Select id="workoutDueDay" {...form.register('dueDay')}>
+                {DUE_DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}일
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="사유" htmlFor="workoutReason" error={errors.reason?.message}>
+              <Input id="workoutReason" {...form.register('reason')} />
+            </Field>
+          </div>
+          {q && (
+            <div className="grid grid-cols-2 gap-x-4 rounded border p-2 text-xs tabular-nums">
+              <span>비용 · 가산이자 · 정상이자 (업무일자 {q.date})</span>
+              <span className="text-right">
+                {formatMoney(q.cost)} · {formatMoney(q.lateInterest)} · {formatMoney(q.normalInterest)}
+              </span>
+              <span>감면 (연체 · 정상 · 원금)</span>
+              <span className="text-right">
+                {formatMoney(q.waiveLate)} · {formatMoney(q.waiveNormal)} · {formatMoney(q.waivePrincipal)}
+              </span>
+              <span>체결일 납부액 / 오늘 이미 입금</span>
+              <span className="text-right">
+                {formatMoney(q.requiredPayment)} / {formatMoney(q.paidToday)}
+              </span>
+              <span className="font-semibold">추가로 입금할 금액</span>
+              <span className="text-right font-semibold">{formatMoney(q.remainingPayment)}</span>
+              <span>조정 원금 · 월 납입액</span>
+              <span className="text-right">
+                {formatMoney(q.newPrincipal)} · {q.installmentAmount == null ? '-' : formatMoney(q.installmentAmount)}
+              </span>
+              {q.schedulePreview.length > 0 && (
+                <>
+                  <span>첫 회차</span>
+                  <span className="text-right">
+                    {q.schedulePreview[0].dueDate} 원금 {formatMoney(q.schedulePreview[0].principalDue)} + 이자{' '}
+                    {formatMoney(q.schedulePreview[0].plannedInterest)}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {q && q.remainingPayment > 0 && (
+            <Alert>미감면 이자 {formatMoney(q.remainingPayment)}을 오늘 날짜로 입금 등록한 뒤 체결하세요.</Alert>
+          )}
+          <ErrorMessage error={quote.error} />
+          <ErrorMessage error={save.error} />
+          <DialogFooter>
+            <Button type="submit" disabled={save.isPending || (q?.remainingPayment ?? 1) > 0}>
+              체결
             </Button>
           </DialogFooter>
         </form>

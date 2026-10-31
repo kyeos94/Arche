@@ -40,7 +40,8 @@ public record SimulationResult(
 		Money prepaymentFeeIfRepaidToday,
 		Money payoffAmount,
 		@Nullable LocalDate paidOffOn,
-		List<String> warnings) {
+		List<String> warnings,
+		List<WorkoutView> workouts) {
 
 	/** 연체일수 = 기준일 − 가장 오래된 미납 회차의 약정일 */
 	public long delinquencyDays() {
