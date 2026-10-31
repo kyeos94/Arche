@@ -44,9 +44,7 @@ public enum Permission {
 	CLOSED_TX_CANCEL("payment.cancel.closed", SYSTEM_ADMIN),
 	/** 마감 후 취소 승인 (R28) */
 	CLOSED_TX_CANCEL_APPROVE("payment.cancel.closed.approve", COLLECTION_LEAD),
-	/**
-	 * 계약 직접 생성·양수 등록. 정책서 9.1에 없는 권한이라 본부장만 허용 (docs/adr/0004-security.md)
-	 */
+	/** 계약 직접 생성·양수 등록 (R34: 본부장만) */
 	LOAN_CREATE("loan.create", HEAD);
 
 	private final String code;
