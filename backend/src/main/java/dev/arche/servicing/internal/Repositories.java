@@ -29,6 +29,14 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 	@Query("select a.id from LoanAccount a where a.status <> 'PAID_OFF' order by a.id")
 	List<Long> findOpenIds();
 
+	/**
+	 * 일마감 판정 대상: 판정일까지 실행(양수)된 열린 계약 중 아직 그날까지 재생하지 않은 것.
+	 * 실행일이 판정일보다 늦은 계약은 재생할 수 없고, 이미 더 뒤까지 재생한 계약을 되돌리지 않는다.
+	 */
+	@Query("select a.id from LoanAccount a where a.status <> 'PAID_OFF' and a.disbursedOn <= :date"
+			+ " and a.asOf <= :date order by a.id")
+	List<Long> findIdsToJudge(@Param("date") LocalDate date);
+
 	@Query("""
 			select a from LoanAccount a
 			where (:status = '' or a.status = :status)

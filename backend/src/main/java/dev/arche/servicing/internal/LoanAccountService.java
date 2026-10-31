@@ -358,7 +358,7 @@ class LoanAccountService implements LoanAccounts {
 		int count = 0;
 		int notices = 0;
 		int accelerations = 0;
-		for (Long id : accounts.findOpenIds()) {
+		for (Long id : accounts.findIdsToJudge(nextDate)) {
 			AccountReplayer.Outcome o = perAccount.execute(status -> {
 				LoanAccount a = lock(id);
 				return replayer.replay(a, replayer.terms(a), nextDate, nextDate, null);
