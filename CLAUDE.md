@@ -10,7 +10,7 @@
 - 문서와 다른 기술 선택은 docs/adr/0001-tech-stack.md 표 참고
 
 ## 기준 문서 (충돌 시 이 순서로 우선)
-1. docs/policy.md — 모든 업무 규칙과 숫자. 9~10장(R1~R37)이 본문보다 우선
+1. docs/policy.md — 모든 업무 규칙과 숫자. 9~10장(R1~R38)이 본문보다 우선
 2. docs/golden-cases.md — 계산 기대값. 테스트가 이 값과 다르면 코드를 고칠 것 (기대값 수정 금지)
 3. docs/guide.md — 설계 방향과 일반론. 수치·규칙이 policy.md와 다르면 policy.md를 따를 것. 16.2~16.3의 엔티티 필드·상태 코드는 스키마 기준
    - guide.md의 기술 스택(Boot 3, Redis, Thymeleaf 등)은 위 '프로젝트'의 스택으로 대체 (docs/adr/0001). guide.md의 그림은 내보내기에서 빠지므로 16.2~16.4 표가 스키마 기준

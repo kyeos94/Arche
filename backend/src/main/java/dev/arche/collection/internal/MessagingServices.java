@@ -124,7 +124,7 @@ class DeferralService {
 /**
  * 자동 문자 (정책서 6장): 약정일 3일 전 납입 안내, 연체 1·7·30일째 연체 안내, 완제 안내 (+ 약속일 3일 전 약속 납부 안내).
  * 일마감이 판정일 08:00 발송분을 만들고, 발송기는 연락 가능 시간 안에서 발송 직전에 다시 판정한다.
- * 연체 안내만 추심 연락이라 7일 7회 한도·연락 유예·소멸시효 완성·약속 이행 중이면 보내지 않는다.
+ * 연체 안내만 추심 연락이라 7일 7회 한도·연락 유예·소멸시효 완성·약속 이행 중이면 보내지 않는다 (R38).
  */
 @Service
 class AutoMessageService {
@@ -179,6 +179,7 @@ class AutoMessageService {
 						judgeDate);
 			}
 			if (v.delinquencyStartedOn() != null) {
+				// 연체 n일째: 납부 기한(휴일 유예 포함) 다음 날이 1일째 (R38)
 				long nth = ChronoUnit.DAYS.between(v.delinquencyStartedOn(), judgeDate) + 1;
 				if (DELINQUENCY_DAYS.contains((int) nth)) {
 					OutboundMessage.Type type = OutboundMessage.Type.valueOf("DELINQUENCY_" + nth);
