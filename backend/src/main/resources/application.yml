@@ -1,6 +1,13 @@
 spring:
   application:
     name: arche
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/arche}
     username: ${DB_USERNAME:arche}
@@ -26,3 +33,22 @@ management:
     web:
       exposure:
         include: health,info,modulith
+
+# 아래 기본값은 로컬 개발·데모 전용이다. 운영에서는 환경변수로 반드시 교체한다 (guide 10.2: KMS·Vault의 데이터 키).
+arche:
+  crypto:
+    field-key-v1: ${ARCHE_FIELD_KEY_V1:sJ+1VdSKc1UcYhAj245xtoYGGgXAWs9bhnIHR+Jd4cA=}
+    index-key: ${ARCHE_INDEX_KEY:HJ+l1Svx2/wH1LSw9LmSv5ni60qxXLvvoXhkWpgolfY=}
+  integration:
+    virtual-account:
+      secret: ${ARCHE_VA_SECRET:local-virtual-account-secret}
+  demo:
+    # 데모 직원(역할별 1명)과 G11·G27·G28 재현용 계약을 만든다. 운영에서는 false
+    enabled: ${ARCHE_DEMO:true}
+    password: ${ARCHE_DEMO_PASSWORD:arche1234!}
+  bootstrap:
+    admin-password: ${ARCHE_ADMIN_PASSWORD:}
+  scheduling:
+    enabled: true
+  closing:
+    cron: "0 0 23 * * *"

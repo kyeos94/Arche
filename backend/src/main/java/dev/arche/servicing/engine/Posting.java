@@ -36,11 +36,12 @@ public record Posting(
 		return type + "|" + sourceRef + "|" + valueDate;
 	}
 
-	/** 금액 내용이 같은지 (seq·잔액 제외) */
+	/** 금액 내용이 같은지 (seq·거래 후 잔액 제외) */
 	public boolean sameAmounts(Posting o) {
 		return amount.equals(o.amount) && principal.equals(o.principal) && normalInterest.equals(o.normalInterest)
 				&& lateInterest.equals(o.lateInterest) && cost.equals(o.cost) && fee.equals(o.fee)
 				&& preAcqInterest.equals(o.preAcqInterest) && suspense.equals(o.suspense) && refund.equals(o.refund)
+				&& normalAccrued.equals(o.normalAccrued) && lateAccrued.equals(o.lateAccrued)
 				&& allocations.equals(o.allocations);
 	}
 }
