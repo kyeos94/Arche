@@ -46,9 +46,9 @@ public enum Permission {
 	CLOSED_TX_CANCEL_APPROVE("payment.cancel.closed.approve", COLLECTION_LEAD),
 	/** 계약 직접 생성·양수 등록 (R34: 본부장만) */
 	LOAN_CREATE("loan.create", HEAD),
-	/** 추심 연락 기록·분할납부 약속 등록 (정책서 9.1에 없음, ADR 0004) */
+	/** 추심 연락 기록·분할납부 약속 등록 (R37) */
 	COLLECTION_ACTIVITY("collection.activity", COLLECTOR, COLLECTION_LEAD, HEAD),
-	/** 소멸시효 중단 사유(지급명령·압류·판결 확정) 기록 (정책서 9.1에 없음, ADR 0004) */
+	/** 소멸시효 중단 사유(지급명령·압류·판결 확정) 기록 (R37) */
 	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD);
 
 	private final String code;
