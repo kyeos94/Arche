@@ -31,11 +31,12 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 
 	@Query("""
 			select a from LoanAccount a
-			where (:status is null or a.status = :status)
+			where (:status = '' or a.status = :status)
 			  and (:allStaff = true or a.assignedStaffId in :staffIds)
-			  and (:accountNo is null or a.accountNo like concat('%', :accountNo, '%'))
+			  and a.accountNo like concat('%', :accountNo, '%')
 			  and (:customerIdsEmpty = true or a.customerId in :customerIds)
 			""")
+	/** status·accountNo는 null 대신 빈 문자열 (PostgreSQL이 null 파라미터를 bytea로 받아 LIKE가 깨짐) */
 	Page<LoanAccount> search(@Param("status") String status, @Param("allStaff") boolean allStaff,
 			@Param("staffIds") Collection<Long> staffIds, @Param("accountNo") String accountNo,
 			@Param("customerIdsEmpty") boolean customerIdsEmpty, @Param("customerIds") Collection<Long> customerIds,

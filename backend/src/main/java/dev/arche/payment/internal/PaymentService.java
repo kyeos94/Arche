@@ -32,9 +32,7 @@ interface PaymentRepository extends JpaRepository<Payment, Long> {
 
 	List<Payment> findByAccountIdOrderByIdDesc(Long accountId);
 
-	@Query("select p from Payment p where (:status is null or p.status = :status)"
-			+ " and (:date is null or p.businessDate = :date) order by p.id desc")
-	List<Payment> search(@Param("status") Payment.Status status, @Param("date") LocalDate date);
+	List<Payment> findTop500ByOrderByIdDesc();
 
 	@Query("select count(p), coalesce(sum(p.amount), 0) from Payment p"
 			+ " where p.businessDate = :date and p.status = dev.arche.payment.internal.Payment.Status.ALLOCATED")

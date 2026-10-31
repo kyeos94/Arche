@@ -194,7 +194,7 @@ class LoanController {
 		DataScope scope = staff.loanScope();
 		boolean all = scope.kind() == DataScope.Kind.ALL;
 		Set<Long> staffIds = all ? Set.of(-1L) : nonEmpty(scope.staffIds());
-		String accountNo = null;
+		String accountNo = "";
 		Set<Long> customerIds = Set.of(-1L);
 		boolean noCustomerFilter = true;
 		if (q != null && !q.isBlank()) {
@@ -205,7 +205,7 @@ class LoanController {
 				accountNo = q.trim();
 			}
 		}
-		Page<LoanAccount> result = accounts.search(blankToNull(status), all, staffIds, accountNo, noCustomerFilter,
+		Page<LoanAccount> result = accounts.search(status == null ? "" : status.trim(), all, staffIds, accountNo, noCustomerFilter,
 				customerIds, PageRequest.of(page, Math.min(size, 200), Sort.by(Sort.Direction.DESC, "id")));
 		return PageResponse.of(result.map(a -> new ListItem(a.getId(), a.accountNo(),
 				customers.get(a.customerId()).name(), a.productCode(), a.status().name(), a.principalBalance(),
@@ -453,9 +453,5 @@ class LoanController {
 
 	private static Set<Long> nonEmpty(Set<Long> ids) {
 		return ids == null || ids.isEmpty() ? Set.of(-1L) : ids;
-	}
-
-	private static String blankToNull(String s) {
-		return s == null || s.isBlank() ? null : s;
 	}
 }

@@ -107,7 +107,9 @@ class PaymentController {
 			@RequestParam(required = false) String status, @RequestParam(required = false) LocalDate date) {
 		LocalDate today = businessDates.today();
 		List<Payment> rows = accountId != null ? payments.findByAccountIdOrderByIdDesc(accountId)
-				: payments.search(status == null ? null : Payment.Status.valueOf(status), date);
+				: payments.findTop500ByOrderByIdDesc().stream()
+						.filter(p -> status == null || p.status().name().equals(status))
+						.filter(p -> date == null || p.businessDate().equals(date)).toList();
 		return rows.stream().map(p -> new PaymentRow(p.getId(), p.accountId(), p.channel().name(), p.valueDate(),
 				p.businessDate(), p.amount().won(), p.depositorName(), p.bankTxId(), p.status().name(),
 				p.processedBy(), p.businessDate().equals(today))).toList();
