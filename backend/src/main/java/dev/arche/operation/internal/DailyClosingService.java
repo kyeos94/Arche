@@ -86,9 +86,10 @@ class DailyClosingService {
 				totals.allocatedCount(), accounts.correctionsPostedOn(d).won(), totals.unmatchedOpenTotal().won(),
 				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches));
 		businessDates.advance(d);
-		log.info("일마감 {} 완료: 계약 {}건 판정, 신규 통지 {}, 상실 {}, 대사 불일치 {}, 추심 알림 {}·{}·{}", d,
-				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches,
-				collection.limitationAlerts(), collection.promiseMisses(), collection.promisesTerminated());
+		log.info("일마감 {} 완료: 계약 {}건 판정, 신규 통지 {}, 상실 {}, 대사 불일치 {}, 추심 알림 {}·{}·{}, 자동 문자 {}건 예약",
+				d, judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches,
+				collection.limitationAlerts(), collection.promiseMisses(), collection.promisesTerminated(),
+				collection.messagesScheduled());
 		return closing;
 	}
 

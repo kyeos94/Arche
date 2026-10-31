@@ -25,6 +25,8 @@ import type {
   ContactDecision,
   PaymentPromise,
   CollectionAlert,
+  ContactDeferral,
+  OutboundMessage,
   WorkoutRequest,
   Schedule,
   StaffRow,
@@ -48,6 +50,8 @@ export const queryKeys = {
   loanContacts: (id: number) => ['loan', id, 'contacts'] as const,
   loanPromises: (id: number) => ['loan', id, 'promises'] as const,
   alerts: ['collection-alerts'] as const,
+  loanDeferrals: (id: number) => ['loan', id, 'deferrals'] as const,
+  loanMessages: (id: number) => ['loan', id, 'messages'] as const,
   unmatched: ['unmatched'] as const,
   corrections: (status: string) => ['corrections', status] as const,
   bulkJob: (id: number) => ['bulk', id] as const,
@@ -139,6 +143,15 @@ export const endpoints = {
     id: number,
     body: { firstMonth: string; day: number; amount: number; months: number; memo?: string },
   ) => api.post<PaymentPromise>(`/api/loans/${id}/promises`, body),
+  deferrals: (id: number) => api.get<ContactDeferral[]>(`/api/loans/${id}/deferrals`),
+  registerDeferral: (id: number, body: { startDate: string; endDate: string; reason: string }) =>
+    api.post<ContactDeferral>(`/api/loans/${id}/deferrals`, body),
+  extendDeferral: (id: number, deferralId: number, endDate: string) =>
+    api.post<ContactDeferral>(`/api/loans/${id}/deferrals/${deferralId}/extend`, { endDate }),
+  endDeferral: (id: number, deferralId: number) =>
+    api.post<ContactDeferral>(`/api/loans/${id}/deferrals/${deferralId}/end`),
+  messages: (id: number) => api.get<OutboundMessage[]>(`/api/loans/${id}/messages`),
+  dispatchMessages: () => api.post<{ sent: number; skipped: number }>('/api/collection/messages/dispatch'),
   alerts: (unreadOnly: boolean) => api.get<CollectionAlert[]>(`/api/collection/alerts${qs({ unreadOnly })}`),
   readAlert: (id: number) => api.post<CollectionAlert>(`/api/collection/alerts/${id}/read`),
   openLoan: (body: OpenLoanRequest) => api.post<AccountRef>('/api/loans', body),

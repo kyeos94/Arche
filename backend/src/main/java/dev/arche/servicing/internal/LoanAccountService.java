@@ -408,6 +408,38 @@ class LoanAccountService implements LoanAccounts {
 
 	@Override
 	@Transactional(readOnly = true)
+	public List<MessagingView> messagingViews(LocalDate paidOffOn) {
+		List<MessagingView> views = new java.util.ArrayList<>();
+		for (Long id : accounts.findOpenIds()) {
+			views.add(messaging(find(id)));
+		}
+		for (LoanAccount a : accounts.findByPaidOffOn(paidOffOn)) {
+			views.add(messaging(a));
+		}
+		return views;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public MessagingView messagingView(long accountId) {
+		return messaging(find(accountId));
+	}
+
+	private MessagingView messaging(LoanAccount a) {
+		List<InstallmentRow> current = installments.findByAccountIdAndScheduleVersionOrderBySeq(a.getId(),
+				a.scheduleVersion());
+		InstallmentRow next = current.stream().filter(i -> a.nextDueDate() != null && i.dueDate().equals(a.nextDueDate()))
+				.findFirst().orElse(null);
+		LocalDate delinquencyStart = current.stream().filter(i -> "OVERDUE".equals(i.status()))
+				.map(i -> i.graceEnd().plusDays(1)).min(LocalDate::compareTo).orElse(null);
+		return new MessagingView(a.getId(), a.accountNo(), a.customerId(), a.status().name(),
+				a.repaymentMethod().name(), a.assignedStaffId(), a.nextDueDate(),
+				next == null ? null : next.principalDue() - next.principalPaid() + next.plannedInterest(),
+				a.delinquentSince(), delinquencyStart, a.paidOffOn(), a.payoffAmount());
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public Money correctionsPostedOn(LocalDate businessDate) {
 		return Money.won(ledger.sumCorrectionsPostedOn(businessDate));
 	}

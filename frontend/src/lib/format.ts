@@ -90,6 +90,15 @@ export const statusLabels: Record<string, string> = {
   NONE: '-',
   NOTIFY_STAFF: '담당자 알림',
   TERMINATE: '약속 해제',
+  SENT: '발송',
+  SKIPPED: '건너뜀',
+  ENDED: '종료',
+  PAYMENT_REMINDER: '납입 안내 (3일 전)',
+  DELINQUENCY_1: '연체 안내 (1일째)',
+  DELINQUENCY_7: '연체 안내 (7일째)',
+  DELINQUENCY_30: '연체 안내 (30일째)',
+  PAYOFF: '완제 안내',
+  PROMISE_REMINDER: '약속 납부 안내',
 }
 
 export function statusLabel(code: string | null | undefined): string {

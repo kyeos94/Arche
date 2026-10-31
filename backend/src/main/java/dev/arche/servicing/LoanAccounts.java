@@ -79,4 +79,20 @@ public interface LoanAccounts {
 
 	/** 완제되지 않은 계약 (추심 일 배치용) */
 	java.util.List<AccountRef> openAccounts();
+
+	/**
+	 * 자동 문자용 계약 상태 (정책서 6장). 마지막 재생 시점(일마감 후에는 판정일) 기준.
+	 *
+	 * @param delinquencyStartedOn 연체 1일째 = 가장 오래된 미납 회차의 납부 기한(휴일 유예 포함) 다음 날
+	 * @param nextPaymentAmount    다음 회차 남은 원금 + 계획 이자 (예정액)
+	 */
+	record MessagingView(long id, String accountNo, long customerId, String status, String repaymentMethod,
+			Long assignedStaffId, LocalDate nextDueDate, Long nextPaymentAmount, LocalDate delinquentSince,
+			LocalDate delinquencyStartedOn, LocalDate paidOffOn, long payoffAmount) {
+	}
+
+	/** 완제되지 않은 계약 + 그날 완제된 계약 */
+	java.util.List<MessagingView> messagingViews(LocalDate paidOffOn);
+
+	MessagingView messagingView(long accountId);
 }

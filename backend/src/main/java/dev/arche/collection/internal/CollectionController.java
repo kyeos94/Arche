@@ -54,6 +54,8 @@ class CollectionController {
 	}
 
 	private final AccountAccess access;
+	private final DeferralService deferralService;
+	private final AutoMessageService autoMessages;
 	private final ContactService contacts;
 	private final ContactLogRepository contactLogs;
 	private final PromiseService promises;
@@ -62,10 +64,13 @@ class CollectionController {
 	private final BusinessDates businessDates;
 	private final Clock clock;
 
-	CollectionController(AccountAccess access, ContactService contacts, ContactLogRepository contactLogs,
+	CollectionController(AccountAccess access, DeferralService deferralService, AutoMessageService autoMessages,
+			ContactService contacts, ContactLogRepository contactLogs,
 			PromiseService promises, CollectionAlertRepository alerts, StaffDirectory staff,
 			BusinessDates businessDates, Clock clock) {
 		this.access = access;
+		this.deferralService = deferralService;
+		this.autoMessages = autoMessages;
 		this.contacts = contacts;
 		this.contactLogs = contactLogs;
 		this.promises = promises;
@@ -117,6 +122,80 @@ class CollectionController {
 	private PromiseDto dto(PaymentPromise p) {
 		return new PromiseDto(p.getId(), p.registeredOn(), p.firstMonth(), p.promiseDay(), p.amount().won(),
 				p.months(), p.status().name(), p.terminatedOn(), p.legalReview(), p.memo(), promises.rows(p));
+	}
+
+	// ------------------------------------------------------------------ 연락 유예 (정책서 6장)
+
+	record DeferralRequest(@NotNull LocalDate startDate, @NotNull LocalDate endDate, String reason) {
+	}
+
+	record ExtendRequest(@NotNull LocalDate endDate) {
+	}
+
+	record DeferralDto(long id, LocalDate startDate, LocalDate endDate, LocalDate originalEnd, boolean extended,
+			String reason, String status, LocalDate endedOn, boolean activeToday) {
+	}
+
+	@GetMapping("/loans/{id}/deferrals")
+	@PreAuthorize("hasAuthority('loan.read')")
+	@Transactional(readOnly = true)
+	List<DeferralDto> deferrals(@PathVariable long id) {
+		access.visible(id);
+		LocalDate today = businessDates.today();
+		return deferralService.of(id).stream().map(d -> dto(d, today)).toList();
+	}
+
+	@PostMapping("/loans/{id}/deferrals")
+	@PreAuthorize("hasAuthority('collection.activity')")
+	DeferralDto registerDeferral(@PathVariable long id, @Valid @RequestBody DeferralRequest body) {
+		access.visible(id);
+		return dto(deferralService.register(id, body.startDate(), body.endDate(), body.reason()),
+				businessDates.today());
+	}
+
+	@PostMapping("/loans/{id}/deferrals/{deferralId}/extend")
+	@PreAuthorize("hasAuthority('collection.activity')")
+	DeferralDto extendDeferral(@PathVariable long id, @PathVariable long deferralId,
+			@Valid @RequestBody ExtendRequest body) {
+		access.visible(id);
+		return dto(deferralService.extend(id, deferralId, body.endDate()), businessDates.today());
+	}
+
+	@PostMapping("/loans/{id}/deferrals/{deferralId}/end")
+	@PreAuthorize("hasAuthority('collection.activity')")
+	DeferralDto endDeferral(@PathVariable long id, @PathVariable long deferralId) {
+		access.visible(id);
+		return dto(deferralService.end(id, deferralId), businessDates.today());
+	}
+
+	private static DeferralDto dto(ContactDeferral d, LocalDate today) {
+		return new DeferralDto(d.getId(), d.startDate(), d.endDate(), d.originalEnd(), d.extended(), d.reason(),
+				d.status().name(), d.endedOn(), d.coversDate(today));
+	}
+
+	// ------------------------------------------------------------------ 자동 문자 (정책서 6장)
+
+	record MessageDto(long id, long accountId, String type, String body, LocalDate scheduledDate, String status,
+			String skipReason, OffsetDateTime sentAt) {
+		static MessageDto of(OutboundMessage m) {
+			return new MessageDto(m.getId(), m.accountId(), m.type().name(), m.body(), m.scheduledDate(),
+					m.status().name(), m.skipReason(), m.sentAt());
+		}
+	}
+
+	@GetMapping("/loans/{id}/messages")
+	@PreAuthorize("hasAuthority('loan.read')")
+	@Transactional(readOnly = true)
+	List<MessageDto> messages(@PathVariable long id) {
+		access.visible(id);
+		return autoMessages.of(id).stream().map(MessageDto::of).toList();
+	}
+
+	/** 수동 발송 (배치 관리). 평소에는 연락 가능 시간에 5분마다 자동 발송 */
+	@PostMapping("/collection/messages/dispatch")
+	@PreAuthorize("hasAuthority('admin.manage')")
+	AutoMessageService.DispatchReport dispatch() {
+		return autoMessages.dispatch();
 	}
 
 	// ------------------------------------------------------------------ 알림

@@ -54,7 +54,7 @@ cd frontend && npm ci && npm run dev      # http://localhost:5173
 | D 박민수 (P5, G15 조건) | 자유상환 | 수시 상환, 금액 오입력 당일 정정(G26) |
 | E 최매입 (N1, G17 조건) | 매입채권 | 충당 순서, 누적 회수율. 추심 탭에서 분할납부 약속 등록·판정(**G19**), 소멸시효 확인(**G13**) |
 
-계약 상세의 **추심** 탭에서 연락을 기록하면 직전 7일 7회 한도·연락 가능 시간·소멸시효 완성 여부로 허용·차단을 판정합니다(**G14**). 소멸시효 임박·약속 불이행 알림은 일마감 때 만들어져 **추심 알림** 화면에 나옵니다.
+계약 상세의 **추심** 탭에서 연락 유예를 등록하거나 연락을 기록하면 직전 7일 7회 한도·연락 가능 시간·소멸시효 완성 여부로 허용·차단을 판정합니다(**G14**). 소멸시효 임박·약속 불이행 알림은 일마감 때 만들어져 **추심 알림** 화면에 나옵니다.
 
 ## 테스트
 
@@ -67,7 +67,7 @@ cd frontend && npm test
 - `GoldenScheduleTest`: [golden/schedules.csv](backend/src/test/resources/golden/schedules.csv) 65행(G1~G4, G20, G24, G25)을 회차 단위로 대조
 - `GoldenScenarioTest`·`PolicyRuleTest`: G5~G28, R3·R5·R9·R23·R29·R32·R33 등 정책 분기, 재생 결정성
 - `ArchitectureTest`: Spring Modulith 모듈 경계, 다른 모듈 Repository 참조 금지, `LocalDate.now()` 금지, double/float 금지, 엔진의 Spring·JPA 비의존
-- `SecurityIT`·`PaymentCorrectionIT`·`WorkoutIT`·`CollectionIT`·`IntegrationFlowsIT`: G13·G14·G19 저장·판정, 채무조정 결재권·체결 거절(R23), 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단
+- `SecurityIT`·`PaymentCorrectionIT`·`WorkoutIT`·`CollectionIT`·`DeferralMessageIT`·`IntegrationFlowsIT`: 연락 유예·자동 문자, G13·G14·G19 저장·판정, 채무조정 결재권·체결 거절(R23), 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단
 
 ## 진행 기록 — 무엇을 왜 이렇게 만들었나
 
@@ -87,7 +87,10 @@ cd frontend && npm test
 6. **추심은 기록은 저장하고 판정은 다시 계산** (G13·G14·G19) — 연락 기록은 차단된 시도까지 남기되 한도에는 허용·예약된 연락만 센다.
    분할납부 약속 판정과 소멸시효 완성일은 저장하지 않고 입금 내역(취소 반영)으로 매번 다시 계산해, 소급 입금·입금 취소가 있어도
    결과가 어긋나지 않게 했다. 저장하는 것은 약속 해제·알림처럼 "그때 한 일"뿐이며 일마감에서 확정한다.
-7. **권한표를 코드 행렬로** ([ADR 0004](docs/adr/0004-security.md)) — 정책서 9.1 표를 `Permission` enum으로 옮기고, 표 자체를 테스트 데이터로 대조한다.
+7. **자동 문자는 만들 때가 아니라 보낼 때 판정** — 일마감이 다음 날 08:00 발송분(약정일 3일 전 납입 안내, 연체 1·7·30일째,
+   완제 안내)을 만들어 두고, 발송기가 연락 가능 시간 안에서 발송 직전에 7일 7회·연락 유예·소멸시효·약속 이행 여부를 다시 본다.
+   밤사이 입금으로 연체가 풀리면 연체 문자는 건너뛴다. 실제 발송은 `MessagingPort` Mock 어댑터가 로그만 남긴다.
+8. **권한표를 코드 행렬로** ([ADR 0004](docs/adr/0004-security.md)) — 정책서 9.1 표를 `Permission` enum으로 옮기고, 표 자체를 테스트 데이터로 대조한다.
 
 ## 확장 지점 (범위 밖)
 
@@ -98,10 +101,10 @@ cd frontend && npm test
 | 법조치 상세(지급명령·압류·경매), 경매 배당금·공탁금 입금 | LegalAction 엔티티 + 비용(COST) 충당 |
 | 상각 확정, 매각·환매, 매각 후 입금 이전 | LoanAccount 상태 전이 + 원장 CHARGE_OFF·SALE 거래 |
 | 신용정보 보고(정보집중), 신용조회, 본인인증, 펌뱅킹 송금 | integration 모듈의 포트 추가 |
-| 문자·팩스·우편 실제 발송, 연락 타임라인 패널 | communication 모듈 (연락 기록·한도 판정은 collection에 있음) |
+| 문자 실제 발송(기관 연계)·팩스·우편, 연락 타임라인 패널 | integration `MessagingPort` 실제 어댑터 + communication 모듈 |
 | 담보·보증인 관리, 담보 시세 연계 | servicing 모듈의 하위 엔티티 |
 | 보고서(일보 상세, 연체 전이율, 대손충당금), 회계 분개 | reporting 모듈 + JournalMapper |
 | 심사 상세(서류 징구, 자동 거절 규칙, 중개수수료 정산), 플랫폼 접수 | origination 모듈 |
 | 수기 조정 거래, 상계, 완제·매각 후 취소(상태 되돌리기) | 원장 ADJUSTMENT 거래 + 결재 |
-| 매입채권 채무조정·조정 완제, 연락 유예(입원·재난), 자동 문자 발송 | collection·communication |
+| 매입채권 채무조정·조정 완제, 매입채권 연체 문자(약정일이 없어 기준일 정의 필요) | collection |
 | 대량 일마감 성능 | 마지막 마감 스냅샷부터 재생 |

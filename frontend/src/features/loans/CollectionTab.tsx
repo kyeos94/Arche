@@ -16,12 +16,14 @@ import { formatDate, formatDateTime, formatMoney, statusLabel } from '@/lib/form
 import { promiseSchema } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
 
-/** 추심 탭: 소멸시효(G13), 연락 기록(G14), 분할납부 약속(G19, 매입채권만) */
+/** 추심 탭: 소멸시효(G13), 연락 유예, 연락 기록(G14), 자동 문자, 분할납부 약속(G19, 매입채권만) */
 export function CollectionTab({ loan }: { loan: LoanDetail }) {
   return (
     <div className="space-y-3">
       <LimitationCard loanId={loan.id} businessDate={loan.businessDate} />
+      <DeferralCard loanId={loan.id} businessDate={loan.businessDate} />
       <ContactsCard loanId={loan.id} />
+      <MessagesCard loanId={loan.id} />
       {loan.repaymentMethod === 'ACQUIRED' && <PromisesCard loan={loan} />}
     </div>
   )
@@ -310,6 +312,172 @@ function PromisesCard({ loan }: { loan: LoanDetail }) {
             </Table>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ------------------------------------------------------------------ 연락 유예 (정책서 6장)
+
+function addMonths(date: string, months: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + months, 1))
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  target.setUTCDate(Math.min(d, last))
+  return target.toISOString().slice(0, 10)
+}
+
+function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: string }) {
+  const client = useQueryClient()
+  const q = useQuery({ queryKey: queryKeys.loanDeferrals(loanId), queryFn: () => endpoints.deferrals(loanId) })
+  const [start, setStart] = useState(businessDate)
+  const [end, setEnd] = useState(addMonths(businessDate, 1))
+  const [reason, setReason] = useState('')
+  const refresh = () => client.invalidateQueries({ queryKey: ['loan', loanId] })
+  const register = useMutation({
+    mutationFn: () => endpoints.registerDeferral(loanId, { startDate: start, endDate: end, reason }),
+    onSuccess: async () => {
+      setReason('')
+      await refresh()
+    },
+  })
+  const extend = useMutation({
+    mutationFn: (v: { id: number; endDate: string }) => endpoints.extendDeferral(loanId, v.id, v.endDate),
+    onSuccess: refresh,
+  })
+  const finish = useMutation({ mutationFn: (id: number) => endpoints.endDeferral(loanId, id), onSuccess: refresh })
+  const active = q.data?.find((d) => d.status === 'ACTIVE' && d.endDate >= businessDate)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          연락 유예 — 입원·재난 등 고객 요청 시 최대 3개월, 1회 연장. 유예 중에는 추심 연락·연체 문자 차단
+          {active?.activeToday && <span className="ml-2 text-amber-700">유예 중</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {!active && (
+          <Can permission="collection.activity">
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                register.mutate()
+              }}
+            >
+              <Field label="시작일" htmlFor="defStart">
+                <Input id="defStart" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+              </Field>
+              <Field label={`종료일 (최대 ${addMonths(start, 3)})`} htmlFor="defEnd">
+                <Input
+                  id="defEnd"
+                  type="date"
+                  value={end}
+                  max={addMonths(start, 3)}
+                  onChange={(e) => setEnd(e.target.value)}
+                />
+              </Field>
+              <Field label="사유" htmlFor="defReason">
+                <Input id="defReason" value={reason} onChange={(e) => setReason(e.target.value)} />
+              </Field>
+              <Button type="submit" size="sm" disabled={register.isPending}>
+                유예 등록
+              </Button>
+            </form>
+          </Can>
+        )}
+        <ErrorMessage error={q.error ?? register.error ?? extend.error ?? finish.error} />
+        <Table>
+          <THead>
+            <TR>
+              <TH>기간</TH>
+              <TH>사유</TH>
+              <TH>상태</TH>
+              <TH>연장</TH>
+              <TH />
+            </TR>
+          </THead>
+          <TBody>
+            {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
+            {q.data?.map((d) => (
+              <TR key={d.id}>
+                <TD>
+                  {formatDate(d.startDate)} ~ {formatDate(d.endDate)}
+                </TD>
+                <TD>{d.reason}</TD>
+                <TD>
+                  <StatusBadge status={d.status} />
+                  {d.endedOn && <span className="ml-1 text-muted-foreground">{formatDate(d.endedOn)} 종료</span>}
+                </TD>
+                <TD>{d.extended ? `연장함 (원래 ${formatDate(d.originalEnd)})` : '-'}</TD>
+                <TD className="space-x-1 text-right">
+                  {d.status === 'ACTIVE' && (
+                    <Can permission="collection.activity">
+                      {!d.extended && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const next = window.prompt('연장 종료일 (최대 3개월 뒤)', addMonths(d.endDate, 3))
+                            if (next) extend.mutate({ id: d.id, endDate: next })
+                          }}
+                        >
+                          연장
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => finish.mutate(d.id)}>
+                        종료
+                      </Button>
+                    </Can>
+                  )}
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ------------------------------------------------------------------ 자동 문자 (정책서 6장)
+
+function MessagesCard({ loanId }: { loanId: number }) {
+  const q = useQuery({ queryKey: queryKeys.loanMessages(loanId), queryFn: () => endpoints.messages(loanId) })
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>자동 문자 — 일마감이 다음 날 08:00 발송분을 만들고, 발송 직전에 한도·유예·시효를 다시 판정</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ErrorMessage error={q.error} />
+        <Table>
+          <THead>
+            <TR>
+              <TH>예정일</TH>
+              <TH>종류</TH>
+              <TH>내용</TH>
+              <TH>상태</TH>
+              <TH>발송·사유</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
+            {q.data?.map((m) => (
+              <TR key={m.id} className={cn(m.status === 'SKIPPED' && 'text-muted-foreground')}>
+                <TD>{formatDate(m.scheduledDate)}</TD>
+                <TD>{statusLabel(m.type)}</TD>
+                <TD className="max-w-md truncate" title={m.body}>
+                  {m.body}
+                </TD>
+                <TD>
+                  <StatusBadge status={m.status} />
+                </TD>
+                <TD>{m.status === 'SENT' ? formatDateTime(m.sentAt) : (m.skipReason ?? '')}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
       </CardContent>
     </Card>
   )

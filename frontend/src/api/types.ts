@@ -251,6 +251,31 @@ export interface PaymentPromise {
   judgments: PromiseJudgment[]
 }
 
+/** 연락 유예 (정책서 6장) */
+export interface ContactDeferral {
+  id: number
+  startDate: string
+  endDate: string
+  originalEnd: string
+  extended: boolean
+  reason: string
+  status: 'ACTIVE' | 'ENDED'
+  endedOn: string | null
+  activeToday: boolean
+}
+
+/** 자동 문자 (정책서 6장) */
+export interface OutboundMessage {
+  id: number
+  accountId: number
+  type: string
+  body: string
+  scheduledDate: string
+  status: 'SCHEDULED' | 'SENT' | 'SKIPPED'
+  skipReason: string | null
+  sentAt: string | null
+}
+
 export interface CollectionAlert {
   id: number
   accountId: number

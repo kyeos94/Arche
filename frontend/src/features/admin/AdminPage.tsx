@@ -17,6 +17,7 @@ function Closing() {
       await client.invalidateQueries()
     },
   })
+  const dispatch = useMutation({ mutationFn: endpoints.dispatchMessages })
   return (
     <Card>
       <CardHeader>
@@ -36,7 +37,16 @@ function Closing() {
           순서: ① 당일 입금 충당 → ② 약정일 가수금 충당 → ③ 연체 판정 → ④ 기한이익상실 판정 → ⑤ 잔액 대사 → ⑥ 업무일자
           변경 (R24)
         </p>
-        <ErrorMessage error={close.error} />
+        <ErrorMessage error={close.error ?? dispatch.error} />
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={dispatch.isPending} onClick={() => dispatch.mutate()}>
+            자동 문자 지금 발송
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            평소에는 08:00~21:00에 5분마다 자동 발송합니다.
+            {dispatch.data && ` 방금: 발송 ${dispatch.data.sent}건, 건너뜀 ${dispatch.data.skipped}건`}
+          </span>
+        </div>
         {close.data && (
           <Alert tone="success">
             {close.data.businessDate} 마감 완료 → 업무일자 {formatDate(close.data.nextBusinessDate)} · 판정{' '}
