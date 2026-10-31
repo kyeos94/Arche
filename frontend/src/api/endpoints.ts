@@ -1,0 +1,146 @@
+import { api, qs } from './client'
+import type {
+  AccessLogRow,
+  AccountRef,
+  BulkJob,
+  BusinessDateInfo,
+  ClosingResult,
+  Correction,
+  CorrectionType,
+  CustomerView,
+  History,
+  LedgerDto,
+  LoanDetail,
+  LoanListItem,
+  Me,
+  PageResponse,
+  PaymentRow,
+  PaymentView,
+  Product,
+  Quote,
+  Schedule,
+  StaffRow,
+  UnmatchedDeposit,
+} from './types'
+
+/** TanStack Query 키 — 계약 하나의 모든 쿼리는 ['loan', id]로 시작해 한 번에 무효화할 수 있다 */
+export const queryKeys = {
+  me: ['me'] as const,
+  businessDate: ['business-date'] as const,
+  loans: (params: LoanSearch) => ['loans', params] as const,
+  statusCounts: ['loans', 'status-counts'] as const,
+  loan: (id: number) => ['loan', id] as const,
+  loanSchedule: (id: number) => ['loan', id, 'schedule'] as const,
+  loanLedger: (id: number) => ['loan', id, 'ledger'] as const,
+  loanHistory: (id: number) => ['loan', id, 'history'] as const,
+  loanPayments: (id: number) => ['loan', id, 'payments'] as const,
+  quote: (id: number, principal: number | null) => ['loan', id, 'quote', principal] as const,
+  unmatched: ['unmatched'] as const,
+  corrections: (status: string) => ['corrections', status] as const,
+  bulkJob: (id: number) => ['bulk', id] as const,
+  closings: ['closings'] as const,
+  staff: ['admin', 'staff'] as const,
+  accessLogs: ['admin', 'access-logs'] as const,
+  products: ['products'] as const,
+}
+
+export interface LoanSearch {
+  status?: string
+  q?: string
+  page?: number
+  size?: number
+}
+
+export interface PaymentRequest {
+  accountId?: number
+  accountNo?: string
+  bankDate: string
+  amount: number
+  depositorName?: string
+  bankTxId?: string
+  channel?: string
+  prepayment?: boolean
+  prepaymentPrincipal?: number | null
+}
+
+export interface CorrectionRequest {
+  type: CorrectionType
+  paymentId: number
+  targetAccountNo?: string
+  correctedAmount?: number
+  reason: string
+}
+
+export interface NewCustomer {
+  name: string
+  residentNo: string
+  birthDate: string
+  phone?: string
+  address?: string
+}
+
+export interface OpenLoanRequest {
+  customerId: number
+  productCode: string
+  principal: number
+  rate: number
+  termMonths: number
+  graceMonths: number
+  dueDay: number
+  disbursedOn?: string
+  assignedStaffId?: number | null
+}
+
+export const endpoints = {
+  csrf: () => api.get<unknown>('/api/auth/csrf'),
+  login: (loginId: string, password: string) => api.post<Me>('/api/auth/login', { loginId, password }),
+  me: () => api.get<Me>('/api/auth/me'),
+  logout: () => api.post<void>('/api/auth/logout'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post<void>('/api/auth/password', { currentPassword, newPassword }),
+  businessDate: () => api.get<BusinessDateInfo>('/api/operation/business-date'),
+
+  loans: (p: LoanSearch) => api.get<PageResponse<LoanListItem>>(`/api/loans${qs({ ...p })}`),
+  statusCounts: () => api.get<Record<string, number>>('/api/loans/status-counts'),
+  loan: (id: number) => api.get<LoanDetail>(`/api/loans/${id}`),
+  schedule: (id: number) => api.get<Schedule>(`/api/loans/${id}/schedule`),
+  ledger: (id: number) => api.get<LedgerDto[]>(`/api/loans/${id}/ledger`),
+  history: (id: number) => api.get<History>(`/api/loans/${id}/history`),
+  quote: (id: number, principal: number | null) =>
+    api.get<Quote>(`/api/loans/${id}/quote${qs({ principal })}`),
+  changeRate: (id: number, body: { rate: number; validFrom: string; reason: string }) =>
+    api.post<AccountRef>(`/api/loans/${id}/rate-changes`, body),
+  changeDueDay: (id: number, body: { dueDay: number; reason: string }) =>
+    api.post<AccountRef>(`/api/loans/${id}/due-day-changes`, body),
+  openLoan: (body: OpenLoanRequest) => api.post<AccountRef>('/api/loans', body),
+  products: () => api.get<Product[]>('/api/products'),
+  registerCustomer: (body: NewCustomer) => api.post<CustomerView>('/api/customers', body),
+  revealResidentNo: (customerId: number, reason: string) =>
+    api.post<{ residentNo: string }>(`/api/customers/${customerId}/reveal`, { reason }),
+
+  payments: (accountId: number) => api.get<PaymentRow[]>(`/api/payments${qs({ accountId })}`),
+  registerPayment: (body: PaymentRequest) => api.post<PaymentView>('/api/payments', body),
+  unmatched: () => api.get<UnmatchedDeposit[]>('/api/unmatched-deposits?status=OPEN'),
+  match: (id: number, accountNo: string) =>
+    api.post<PaymentView>(`/api/unmatched-deposits/${id}/match`, { accountNo }),
+  requestCorrection: (body: CorrectionRequest) => api.post<Correction>('/api/payment-corrections', body),
+  corrections: (status: string) => api.get<Correction[]>(`/api/payment-corrections${qs({ status })}`),
+  approveCorrection: (id: number, approve: boolean) =>
+    api.post<Correction>(`/api/payment-corrections/${id}/approval`, { approve }),
+
+  uploadBulk: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.upload<BulkJob>('/api/payments/bulk', form)
+  },
+  bulkJob: (id: number) => api.get<BulkJob>(`/api/payments/bulk/${id}`),
+  executeBulk: (id: number) => api.post<BulkJob>(`/api/payments/bulk/${id}/execute`),
+  bulkTemplateUrl: '/api/payments/bulk/template',
+  bulkFailuresUrl: (id: number) => `/api/payments/bulk/${id}/failures`,
+
+  close: () => api.post<ClosingResult>('/api/operation/closings'),
+  closings: () => api.get<ClosingResult[]>('/api/operation/closings'),
+  staff: () => api.get<StaffRow[]>('/api/admin/staff'),
+  unlockStaff: (id: number) => api.post<void>(`/api/admin/staff/${id}/unlock`),
+  accessLogs: () => api.get<AccessLogRow[]>('/api/admin/access-logs'),
+}

@@ -38,3 +38,21 @@ jobs:
         with:
           name: backend-test-reports
           path: backend/build/reports/tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: 테스트
+        run: npm test
+      - name: 빌드
+        run: npm run build
