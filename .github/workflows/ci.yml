@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 단위 테스트
+        run: ./gradlew test
+      - name: 통합 테스트 (Testcontainers)
+        run: ./gradlew integrationTest
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: backend-test-reports
+          path: backend/build/reports/tests
