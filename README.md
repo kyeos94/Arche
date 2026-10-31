@@ -31,6 +31,13 @@ cd backend && ./gradlew bootRun           # http://localhost:8080
 cd frontend && npm ci && npm run dev      # http://localhost:5173
 ```
 
+포트가 다른 프로젝트와 겹치면 바꿔서 띄웁니다.
+
+```bash
+cd backend && ./gradlew bootRun --args='--server.port=8081'
+cd frontend && ARCHE_WEB_PORT=5174 ARCHE_API_URL=http://localhost:8081 npm run dev   # http://localhost:5174
+```
+
 접속 정보는 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`로 바꿉니다. 운영에서는 `ARCHE_DEMO=false`와 암호화 키
 (`ARCHE_FIELD_KEY_V1`, `ARCHE_INDEX_KEY`, Base64 32바이트), `ARCHE_VA_SECRET`, `ARCHE_ADMIN_PASSWORD`를 반드시 넣습니다.
 
