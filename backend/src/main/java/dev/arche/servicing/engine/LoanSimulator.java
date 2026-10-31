@@ -373,7 +373,7 @@ public final class LoanSimulator {
 			if (activeWorkout != null && !accelerated && paidOffOn == null && consecutiveUnresolved(3)) {
 				restoreWorkout(d);
 			}
-			// 채무조정 중에는 R4 대신 R9(3회차 연속 미납 → 상실 복귀)를 적용한다
+			// 채무조정 중에는 R4 대신 R9(3회차 연속 미납 → 상실 복귀)를 적용한다 (R35)
 			if (active == null && !accelerated && activeWorkout == null && paidOffOn == null
 					&& method != RepaymentMethod.ACQUIRED && !matured(d) && reasonExists(d)) {
 				KnownNotice known = unusedKnown.stream().filter(k -> k.reasonDate().equals(d)).findFirst()
@@ -507,7 +507,7 @@ public final class LoanSimulator {
 				return;
 			}
 			if (pendingWorkout != null) {
-				// 채무조정 체결일 입금은 미감면 이자·비용부터 받고, 남는 돈은 가수금 (R23)
+				// 채무조정 체결일 입금은 미감면 이자·비용에만 충당하고, 남는 돈은 가수금 (R36)
 				allocate(d, p.amount(), false, PostingType.REPAYMENT, p.ref(), false, true);
 				return;
 			}
@@ -760,7 +760,7 @@ public final class LoanSimulator {
 			checkPaidOff(d);
 		}
 
-		/** 조정 후 3회차 연속 미납: 감면액을 되살리고 기한이익상실 상태로 복귀 (R9) */
+		/** 조정 후 3회차 연속 미납: 통지 없이 감면액을 되살리고 기한이익상실 상태로 복귀 (R9·R35) */
 		private void restoreWorkout(LocalDate d) {
 			WorkoutState ws = activeWorkout;
 			activeWorkout = null;

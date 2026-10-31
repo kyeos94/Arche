@@ -325,7 +325,7 @@ class GoldenScenarioTest {
 		}
 
 		@Test
-		void R23_미감면_이자를_체결일에_받지_못하면_체결하지_않는다() {
+		void R23_R36_미감면_이자를_체결일에_받지_못하면_체결하지_않는다() {
 			var r = simulate(G2, concat(payScheduled(G2, 2),
 					List.of(pay("SHORT", "2026-09-01", 100_000), g23Workout())), "2026-09-01");
 
@@ -338,7 +338,7 @@ class GoldenScenarioTest {
 		}
 
 		@Test
-		void R9_조정_후_3회차_연속_미납이면_감면액을_되살리고_상실로_복귀() {
+		void R9_R35_조정_후_3회차_연속_미납이면_감면액을_되살리고_상실로_복귀() {
 			// 1회차 10-25(일 → 유예 10-26), 2회차 11-25, 3회차 12-25(공휴일 → 유예 12-28) 모두 미납 → 12-29 복귀
 			var two = simulate(G2, g23Events(), "2026-12-28");
 			assertThat(two.status()).isEqualTo(AccountStatus.WORKOUT);
