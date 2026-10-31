@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Can } from '@/features/auth/auth'
 import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { CollectionTab } from './CollectionTab'
 import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
 import { HistoryTab, LedgerTab, ScheduleTab } from './tabs'
@@ -113,12 +114,14 @@ export function LoanDetailPage() {
           <TabsTrigger value="ledger">거래원장</TabsTrigger>
           <TabsTrigger value="payments">입금내역</TabsTrigger>
           <TabsTrigger value="history">조건변경이력</TabsTrigger>
+          <TabsTrigger value="collection">추심</TabsTrigger>
         </TabsList>
         {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
         <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
         <TabsContent value="ledger">{tab === 'ledger' && <LedgerTab loanId={id} />}</TabsContent>
         <TabsContent value="payments">{tab === 'payments' && <PaymentsTab loanId={id} />}</TabsContent>
         <TabsContent value="history">{tab === 'history' && <HistoryTab loanId={id} />}</TabsContent>
+        <TabsContent value="collection">{tab === 'collection' && <CollectionTab loan={loan} />}</TabsContent>
       </Tabs>
     </div>
   )

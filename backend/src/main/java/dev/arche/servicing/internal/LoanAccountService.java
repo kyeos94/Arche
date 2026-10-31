@@ -42,6 +42,7 @@ class LoanAccountService implements LoanAccounts {
 	private final AcquisitionRepository acquisitions;
 	private final LedgerEntryRepository ledger;
 	private final AccountReplayer replayer;
+	private final LimitationService limitationService;
 	private final ProductCatalog products;
 	private final BusinessDates businessDates;
 	private final NumberGenerator numbers;
@@ -51,6 +52,7 @@ class LoanAccountService implements LoanAccounts {
 	LoanAccountService(LoanAccountRepository accounts, RateTermRepository rateTerms,
 			DueDayTermRepository dueDayTerms, AccountEventRepository events, InstallmentRepository installments,
 			AcquisitionRepository acquisitions, LedgerEntryRepository ledger, AccountReplayer replayer,
+			LimitationService limitationService,
 			ProductCatalog products, BusinessDates businessDates, NumberGenerator numbers, Clock clock,
 			PlatformTransactionManager tx) {
 		this.accounts = accounts;
@@ -61,6 +63,7 @@ class LoanAccountService implements LoanAccounts {
 		this.acquisitions = acquisitions;
 		this.ledger = ledger;
 		this.replayer = replayer;
+		this.limitationService = limitationService;
 		this.products = products;
 		this.businessDates = businessDates;
 		this.numbers = numbers;
@@ -381,6 +384,26 @@ class LoanAccountService implements LoanAccounts {
 			}
 		}
 		return mismatches;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public dev.arche.servicing.LimitationInfo limitation(long accountId) {
+		return limitationService.of(find(accountId));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<PaymentRecord> payments(long accountId) {
+		return events.findByAccountIdOrderById(accountId).stream()
+				.filter(e -> e.active() && e.type() == AccountEvent.Type.PAYMENT)
+				.map(e -> new PaymentRecord(e.eventDate(), Money.won(e.amount()))).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<AccountRef> openAccounts() {
+		return accounts.findOpenIds().stream().map(id -> ref(find(id))).toList();
 	}
 
 	@Override

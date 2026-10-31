@@ -1,6 +1,7 @@
 package dev.arche.operation.internal;
 
 import dev.arche.calendar.BusinessDates;
+import dev.arche.collection.CollectionDaily;
 import dev.arche.common.BusinessException;
 import dev.arche.payment.Payments;
 import dev.arche.servicing.LoanAccounts;
@@ -30,6 +31,7 @@ interface DailyClosingRepository extends JpaRepository<DailyClosing, Long> {
  * <ol>
  * <li>당일 입금 매칭·충당: 입금은 등록 즉시 충당되므로 여기서는 집계만</li>
  * <li>약정일 도래 건 가수금 충당 · ③ 연체 판정 · ④ 기한이익상실 사유·상실 판정: 열린 계약 전체를 D+1까지 재생</li>
+ * <li>(추심) 소멸시효 임박·완성 알림, 분할납부 약속 판정·해제 (G13·G19)</li>
  * <li value="5">잔액 대사: 계약 요약 잔액 = 원장 합계</li>
  * <li>업무일자 변경</li>
  * </ol>
@@ -44,15 +46,17 @@ class DailyClosingService {
 	private final BusinessDates businessDates;
 	private final LoanAccounts accounts;
 	private final Payments payments;
+	private final CollectionDaily collectionDaily;
 	private final StaffDirectory staff;
 	private final Clock clock;
 
 	DailyClosingService(DailyClosingRepository closings, BusinessDates businessDates, LoanAccounts accounts,
-			Payments payments, StaffDirectory staff, Clock clock) {
+			Payments payments, CollectionDaily collectionDaily, StaffDirectory staff, Clock clock) {
 		this.closings = closings;
 		this.businessDates = businessDates;
 		this.accounts = accounts;
 		this.payments = payments;
+		this.collectionDaily = collectionDaily;
 		this.staff = staff;
 		this.clock = clock;
 	}
@@ -75,14 +79,16 @@ class DailyClosingService {
 		}
 		Payments.DailyTotals totals = payments.totalsFor(d);
 		LoanAccounts.JudgeReport judged = accounts.judgeAll(d.plusDays(1));
+		CollectionDaily.Report collection = collectionDaily.run(d.plusDays(1));
 		int mismatches = accounts.reconcile();
 		DailyClosing closing = closings.save(new DailyClosing(d, OffsetDateTime.now(clock),
 				staff.currentIfAny().map(CurrentStaff::loginId).orElse("batch"), totals.allocatedTotal().won(),
 				totals.allocatedCount(), accounts.correctionsPostedOn(d).won(), totals.unmatchedOpenTotal().won(),
 				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches));
 		businessDates.advance(d);
-		log.info("일마감 {} 완료: 계약 {}건 판정, 신규 통지 {}, 상실 {}, 대사 불일치 {}", d, judged.accounts(),
-				judged.newNotices(), judged.accelerations(), mismatches);
+		log.info("일마감 {} 완료: 계약 {}건 판정, 신규 통지 {}, 상실 {}, 대사 불일치 {}, 추심 알림 {}·{}·{}", d,
+				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches,
+				collection.limitationAlerts(), collection.promiseMisses(), collection.promisesTerminated());
 		return closing;
 	}
 

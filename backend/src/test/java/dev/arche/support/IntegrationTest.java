@@ -4,7 +4,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpSession;
@@ -44,6 +48,13 @@ public abstract class IntegrationTest {
 		@ServiceConnection
 		PostgreSQLContainer postgres() {
 			return new PostgreSQLContainer("postgres:18-alpine");
+		}
+
+		/** 연락 가능 시간(08:00~21:00) 판정이 CI 실행 시각에 흔들리지 않게 오전 10시로 고정 */
+		@Bean
+		@Primary
+		Clock testClock() {
+			return Clock.fixed(Instant.parse("2026-06-12T01:00:00Z"), ZoneId.of("Asia/Seoul"));
 		}
 	}
 

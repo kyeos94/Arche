@@ -35,6 +35,8 @@ class PermissionMatrixTest {
 			ADMIN                      | - - - - - - O
 			CLOSED_TX_CANCEL           | - - - - - - O
 			LOAN_CREATE                | - - - - - O -
+			COLLECTION_ACTIVITY        | - - O O - O -
+			LEGAL_EVENT                | - - - O - O -
 			""")
 	void 정책서_9_1_권한표와_같다(Permission permission, String row) {
 		List<String> marks = Arrays.asList(row.trim().split("\\s+"));

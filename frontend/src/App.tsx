@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router'
+import { AlertsPage } from '@/features/collection/AlertsPage'
 import { Layout } from '@/components/Layout'
 import { AdminPage } from '@/features/admin/AdminPage'
 import { useAuth } from '@/features/auth/auth'
@@ -25,6 +26,7 @@ export function App() {
         <Route path="loans" element={<LoanListPage />} />
         <Route path="loans/new" element={<NewLoanPage />} />
         <Route path="loans/:id" element={<LoanDetailPage />} />
+        <Route path="alerts" element={<AlertsPage />} />
         <Route path="unmatched" element={<UnmatchedPage />} />
         <Route path="corrections" element={<CorrectionsPage />} />
         <Route path="bulk" element={<BulkPage />} />

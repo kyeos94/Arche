@@ -10,6 +10,7 @@ import dev.arche.customer.Customers;
 import dev.arche.product.ProductCatalog;
 import dev.arche.product.ProductView;
 import dev.arche.servicing.AccountRef;
+import dev.arche.servicing.LimitationInfo;
 import dev.arche.servicing.LoanAccounts;
 import dev.arche.servicing.engine.AccountStatus;
 import dev.arche.servicing.engine.LimitationPeriod;
@@ -169,6 +170,7 @@ class LoanController {
 	private final AcquisitionRepository acquisitions;
 	private final AccountReplayer replayer;
 	private final LoanAccountService service;
+	private final LimitationService limitationService;
 	private final Customers customers;
 	private final ProductCatalog products;
 	private final StaffDirectory staff;
@@ -177,7 +179,7 @@ class LoanController {
 	LoanController(LoanAccountRepository accounts, RateTermRepository rateTerms, DueDayTermRepository dueDayTerms,
 			InstallmentRepository installments, LedgerEntryRepository ledger, AccelerationNoticeRepository notices,
 			AccountEventRepository events, AcquisitionRepository acquisitions, AccountReplayer replayer,
-			LoanAccountService service, Customers customers, ProductCatalog products, StaffDirectory staff,
+			LoanAccountService service, LimitationService limitationService, Customers customers, ProductCatalog products, StaffDirectory staff,
 			BusinessDates businessDates) {
 		this.accounts = accounts;
 		this.rateTerms = rateTerms;
@@ -189,6 +191,7 @@ class LoanController {
 		this.acquisitions = acquisitions;
 		this.replayer = replayer;
 		this.service = service;
+		this.limitationService = limitationService;
 		this.customers = customers;
 		this.products = products;
 		this.staff = staff;
@@ -257,13 +260,7 @@ class LoanController {
 		List<LocalDate> paymentDates = events.findByAccountIdOrderById(id).stream()
 				.filter(e -> e.active() && e.type() == AccountEvent.Type.PAYMENT).map(AccountEvent::eventDate)
 				.toList();
-		LocalDate limitationStart = acq != null ? acq.limitationStartDate()
-				: a.acceleratedOn() != null ? a.acceleratedOn()
-						: a.maturityDate() != null && a.maturityDate().isBefore(today) ? a.maturityDate() : null;
-		List<LocalDate> interruptions = limitationStart == null ? List.of()
-				: paymentDates.stream().filter(d -> d.isAfter(limitationStart)).toList();
-		LocalDate limitation = LimitationPeriod.completionDate(limitationStart, interruptions,
-				acq == null ? null : acq.judgmentConfirmedOn());
+		LocalDate limitation = limitationService.of(a).completionDate();
 		Acquisition acquisition = acq == null ? null
 				: new Acquisition(acq.acquiredOn(), acq.acquisitionPrice().won(), acq.seller(),
 						acq.appliedRate().percent(), acq.interestMode(),
@@ -426,6 +423,30 @@ class LoanController {
 		if (needed && !me.has(p)) {
 			throw new BusinessException("FORBIDDEN", what + " 감면 결재 권한이 없습니다");
 		}
+	}
+
+	// ------------------------------------------------------------------ 소멸시효 (G13)
+
+	record LimitationEventRequest(@NotNull LimitationEvent.Type type, @NotNull LocalDate date, String memo) {
+	}
+
+	@GetMapping("/{id}/limitation")
+	@PreAuthorize("hasAuthority('loan.read')")
+	@Transactional(readOnly = true)
+	LimitationInfo limitation(@PathVariable long id) {
+		return limitationService.of(visible(id));
+	}
+
+	/** 지급명령 신청·압류·판결 확정 기록 (중단 → 다시 5년, 확정 → 10년) */
+	@PostMapping("/{id}/limitation-events")
+	@PreAuthorize("hasAuthority('collection.legal')")
+	LimitationInfo recordLimitationEvent(@PathVariable long id, @Valid @RequestBody LimitationEventRequest body) {
+		LoanAccount a = visible(id);
+		if (body.date().isAfter(businessDates.today())) {
+			throw new BusinessException("DATE_INVALID", "업무일자 이후 날짜는 기록할 수 없습니다");
+		}
+		limitationService.record(id, body.type(), body.date(), body.memo());
+		return limitationService.of(a);
 	}
 
 	// ------------------------------------------------------------------ 변경

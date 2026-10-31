@@ -27,6 +27,14 @@ public final class ContactQuotaGuard {
 
 	private final List<LocalDate> allowedContacts = new ArrayList<>();
 
+	public ContactQuotaGuard() {
+	}
+
+	/** 이미 허용된(한도에 세는) 연락 날짜로 시작 */
+	public ContactQuotaGuard(java.util.Collection<LocalDate> priorAllowed) {
+		allowedContacts.addAll(priorAllowed);
+	}
+
 	/** 시도 하나를 판정하고, 허용되면 기록한다 */
 	public Decision attempt(Attempt a) {
 		if (a.channel() == Channel.STATUTORY_NOTICE) {

@@ -187,6 +187,79 @@ export interface History {
   }[]
 }
 
+/** 소멸시효 (G13) */
+export interface LimitationInfo {
+  start: string | null
+  startReason: string | null
+  events: { date: string; type: string; memo: string | null; counted: boolean }[]
+  completionDate: string | null
+  alertDates: string[]
+  completed: boolean
+}
+
+export type ContactChannel = 'CALL' | 'SMS' | 'VISIT' | 'STATUTORY_NOTICE'
+
+/** 추심 연락 (G14) */
+export interface ContactRow {
+  id: number
+  contactDate: string
+  contactedAt: string
+  channel: ContactChannel
+  result: 'ALLOWED' | 'SCHEDULED' | 'BLOCKED'
+  countInWindow: number
+  reason: string | null
+  memo: string | null
+  createdBy: string
+}
+
+export interface Contacts {
+  businessDate: string
+  remainingToday: number
+  contacts: ContactRow[]
+}
+
+export interface ContactDecision {
+  id: number
+  contactDate: string
+  result: string
+  countInWindow: number
+  reason: string | null
+}
+
+/** 분할납부 약속 (G19) */
+export interface PromiseJudgment {
+  index: number
+  promiseDate: string
+  deadline: string
+  paid: number
+  fulfilled: boolean | null
+  consecutiveMisses: number
+  action: string
+}
+
+export interface PaymentPromise {
+  id: number
+  registeredOn: string
+  firstMonth: string
+  day: number
+  amount: number
+  months: number
+  status: string
+  terminatedOn: string | null
+  legalReview: boolean
+  memo: string | null
+  judgments: PromiseJudgment[]
+}
+
+export interface CollectionAlert {
+  id: number
+  accountId: number
+  type: string
+  message: string
+  alertDate: string
+  readAt: string | null
+}
+
 /** 채무조정 견적 (R9·R23) */
 export interface WorkoutQuote {
   date: string

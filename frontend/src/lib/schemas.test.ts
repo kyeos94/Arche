@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { correctionSchema, dueDayChangeSchema, openLoanSchema, paymentSchema, rateChangeSchema, workoutSchema } from './schemas'
+import { correctionSchema, dueDayChangeSchema, openLoanSchema, paymentSchema, promiseSchema, rateChangeSchema, workoutSchema } from './schemas'
 
 describe('schemas', () => {
   it('약정일은 5·10·15·20·25일만', () => {
@@ -71,5 +71,16 @@ describe('workoutSchema', () => {
 
   it('분할은 최대 60회 (R9)', () => {
     expect(workoutSchema.safeParse({ ...base, installments: '61' }).success).toBe(false)
+  })
+})
+
+describe('promiseSchema', () => {
+  it('매월 7일 300,000원 × 5회 (G19)', () => {
+    const v = promiseSchema.parse({ firstMonth: '2026-08', day: '7', amount: '300,000', months: '5' })
+    expect(v).toMatchObject({ firstMonth: '2026-08', day: 7, amount: 300000, months: 5 })
+  })
+
+  it('약속일은 1~31일', () => {
+    expect(promiseSchema.safeParse({ firstMonth: '2026-08', day: '32', amount: '1', months: '1' }).success).toBe(false)
   })
 })

@@ -62,6 +62,15 @@ export const rateChangeSchema = z.object({
 
 export const dueDayChangeSchema = z.object({ dueDay, reason })
 
+/** 분할납부 약속 (R18): 매월 n일에 m원 */
+export const promiseSchema = z.object({
+  firstMonth: z.string().regex(/^\d{4}-\d{2}$/, 'yyyy-MM 형식으로 입력하세요'),
+  day: z.coerce.number().int().min(1, '1~31일').max(31, '1~31일'),
+  amount: money,
+  months: z.coerce.number().int().min(1, '1회 이상').max(60, '최대 60회'),
+  memo: z.string().max(200).optional(),
+})
+
 /** 감면액: 비워 두면 0 */
 const waiver = z
   .union([z.string(), z.number()])

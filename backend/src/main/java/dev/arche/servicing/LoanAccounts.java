@@ -66,4 +66,17 @@ public interface LoanAccounts {
 
 	record JudgeReport(int accounts, int newNotices, int accelerations) {
 	}
+
+	/** 유효한 입금 (취소 제외). 은행 거래일자 기준 */
+	record PaymentRecord(LocalDate bankDate, Money amount) {
+	}
+
+	/** 소멸시효 (G13). 데이터 범위 검사는 호출자 책임 */
+	LimitationInfo limitation(long accountId);
+
+	/** 계약의 유효한 입금 내역 (분할납부 약속 판정 등, R18) */
+	java.util.List<PaymentRecord> payments(long accountId);
+
+	/** 완제되지 않은 계약 (추심 일 배치용) */
+	java.util.List<AccountRef> openAccounts();
 }

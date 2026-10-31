@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 const nav: { to: string; label: string; permission?: string }[] = [
   { to: '/loans', label: '계약 목록', permission: 'loan.read' },
   { to: '/loans/new', label: '계약 등록', permission: 'loan.create' },
+  { to: '/alerts', label: '추심 알림', permission: 'loan.read' },
   { to: '/unmatched', label: '미확인 입금', permission: 'payment.register' },
   { to: '/corrections', label: '정정 승인', permission: 'payment.cancel.closed.approve' },
   { to: '/bulk', label: '입금 일괄 등록', permission: 'payment.register' },
