@@ -64,6 +64,12 @@ class Staff extends BaseEntity {
 		failedAttempts = 0;
 	}
 
+	/** 역할·팀 변경 (R71). 검증은 StaffRoleService */
+	void changeRole(Role newRole, Long newTeamId) {
+		this.role = newRole;
+		this.teamId = newTeamId;
+	}
+
 	void unlock() {
 		locked = false;
 		failedAttempts = 0;
