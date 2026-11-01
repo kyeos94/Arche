@@ -2,6 +2,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AlertsPage } from '@/features/collection/AlertsPage'
 import { Layout } from '@/components/Layout'
 import { AdminPage } from '@/features/admin/AdminPage'
+import { MenuAdminPage } from '@/features/admin/MenuAdminPage'
+import { PermissionAdminPage } from '@/features/admin/PermissionAdminPage'
 import { useAuth } from '@/features/auth/auth'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { PasswordChangePage } from '@/features/auth/PasswordChangePage'
@@ -69,6 +71,8 @@ function StaffApp() {
         <Route path="bulk" element={<BulkPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="admin/menus" element={<MenuAdminPage />} />
+        <Route path="admin/permissions" element={<PermissionAdminPage />} />
         <Route path="withdrawals" element={<WithdrawalsPage />} />
         <Route path="message-templates" element={<TemplatesPage />} />
         <Route path="credit-reports" element={<CreditReportsPage />} />

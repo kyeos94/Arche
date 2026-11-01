@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { GlobalSearch } from '@/components/GlobalSearch'
-import { type NavGroup, activeItem, visibleGroups } from '@/components/navMenu'
+import { adminConsole, adminConsoleKeys } from '@/api/adminConsole'
+import { type NavGroup, NAV_GROUPS, activeItem, toNavGroups, visibleGroups } from '@/components/navMenu'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth'
@@ -17,7 +18,9 @@ export function Layout() {
   const { data: bd } = useQuery({ queryKey: queryKeys.businessDate, queryFn: endpoints.businessDate })
   const prefs = usePreferences()
   const top = prefs.nav === 'top'
-  const groups = visibleGroups(can)
+  // 메뉴 관리(R70)에서 저장한 메뉴. 받기 전·실패 시에는 기본 메뉴
+  const menu = useQuery({ queryKey: adminConsoleKeys.menus, queryFn: adminConsole.menus, staleTime: 60_000 })
+  const groups = visibleGroups(can, menu.data ? toNavGroups(menu.data) : NAV_GROUPS)
   const { pathname } = useLocation()
   const active = activeItem(groups, pathname)
   const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(prefs.theme) + 1) % THEME_ORDER.length]
@@ -33,9 +36,9 @@ export function Layout() {
         </div>
         <div className="flex items-center gap-2 text-xs">
           {can('loan.read') && <GlobalSearch />}
-          <span className="mr-1">
+          <NavLink to="/account" className="mr-1 hover:underline" title="내 계정">
             {me?.name} · {me?.roleLabel}
-          </span>
+          </NavLink>
           <Button
             size="sm"
             variant="outline"
