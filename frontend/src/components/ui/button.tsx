@@ -13,6 +13,8 @@ const buttonVariants = cva(
         outline: 'border bg-background hover:bg-muted',
         ghost: 'hover:bg-muted',
         link: 'text-primary underline-offset-4 hover:underline',
+        /** 엑셀 다운로드 전용 (모든 화면 같은 초록색) */
+        excel: 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600',
       },
       size: {
         default: 'h-8 px-3',

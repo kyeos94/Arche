@@ -49,9 +49,9 @@ export function BulkPage() {
       <Card>
         <CardHeader>
           <CardTitle>엑셀 업로드</CardTitle>
-          <a className="text-xs text-primary hover:underline" href={endpoints.bulkTemplateUrl}>
-            양식 내려받기
-          </a>
+          <Button asChild size="sm" variant="excel">
+            <a href={endpoints.bulkTemplateUrl}>양식 내려받기</a>
+          </Button>
         </CardHeader>
         <CardContent className="flex items-center gap-2">
           <Input
@@ -79,7 +79,7 @@ export function BulkPage() {
                 </Button>
               )}
               {(data.failedRows > 0 || data.totalRows > data.validRows) && (
-                <Button asChild variant="outline">
+                <Button asChild variant="excel">
                   <a href={endpoints.bulkFailuresUrl(data.id)}>실패 행 내려받기</a>
                 </Button>
               )}

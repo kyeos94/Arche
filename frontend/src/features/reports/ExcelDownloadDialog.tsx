@@ -46,7 +46,7 @@ export function ExcelDownloadDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="excel">
           엑셀 다운로드
         </Button>
       </DialogTrigger>
@@ -72,7 +72,7 @@ export function ExcelDownloadDialog({
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 취소
               </Button>
-              <Button type="submit" disabled={download.isPending}>
+              <Button type="submit" variant="excel" disabled={download.isPending}>
                 {download.isPending ? '내려받는 중…' : '다운로드'}
               </Button>
             </DialogFooter>
