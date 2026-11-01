@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import type { z } from 'zod'
 import { lifecycleApi, adjustmentTypeLabels, type AdjustmentRequestDto } from '@/api/lifecycle'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatMoney, statusLabel } from '@/lib/format'
 import { reasonSchema } from '@/lib/lifecycleSchemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 /** 생애주기 변경 뒤: 계약 쿼리 전부 + 목록·후보·결재 목록 */
@@ -122,72 +124,75 @@ export function RequestsTable({ rows, showAccount }: { rows: AdjustmentRequestDt
     status: (r) => statusLabel(r.status),
     consumedOn: (r) => r.consumedOn,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-2">
       <ErrorMessage error={decide.error} />
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('requestNo')}>요청번호</SortTH>
-            <SortTH {...header('type')}>유형</SortTH>
-            {showAccount && <SortTH {...header('account')}>계약</SortTH>}
-            <TH>내용</TH>
-            <SortTH {...header('reason')}>사유</SortTH>
-            <SortTH {...header('requestedOn')}>요청</SortTH>
-            <SortTH {...header('decidedOn')}>결재</SortTH>
-            <SortTH {...header('status')}>상태</SortTH>
-            <SortTH {...header('consumedOn')}>사용일</SortTH>
-            <TH />
-          </TR>
-        </THead>
-        <TBody>
-          {rows.length === 0 && <EmptyRow colSpan={cols} />}
-          {sorted.map((r) => (
-            <TR key={r.id}>
-              <TD>{r.requestNo}</TD>
-              <TD>{adjustmentTypeLabels[r.type]}</TD>
-              {showAccount && (
-                <TD>
-                  <Link className="text-primary hover:underline" to={`/loans/${r.accountId}`}>
-                    {r.accountNo}
-                  </Link>
-                </TD>
-              )}
-              <TD>{describeRequest(r)}</TD>
-              <TD>{r.reason}</TD>
-              <TD>
-                {r.requestedBy} · {formatDate(r.requestedOn)}
-              </TD>
-              <TD>{r.decidedBy ? `${r.decidedBy} · ${formatDate(r.decidedOn)}` : '-'}</TD>
-              <TD>
-                <StatusBadge status={r.status} />
-              </TD>
-              <TD>{formatDate(r.consumedOn)}</TD>
-              <TD>
-                {canApprove && r.status === 'REQUESTED' && r.requestedBy !== me?.loginId && (
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      disabled={decide.isPending}
-                      onClick={() => decide.mutate({ id: r.id, approve: true })}
-                    >
-                      승인
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={decide.isPending}
-                      onClick={() => decide.mutate({ id: r.id, approve: false })}
-                    >
-                      반려
-                    </Button>
-                  </div>
-                )}
-              </TD>
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('requestNo')}>요청번호</SortTH>
+              <SortTH {...header('type')}>유형</SortTH>
+              {showAccount && <SortTH {...header('account')}>계약</SortTH>}
+              <TH>내용</TH>
+              <SortTH {...header('reason')}>사유</SortTH>
+              <SortTH {...header('requestedOn')}>요청</SortTH>
+              <SortTH {...header('decidedOn')}>결재</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <SortTH {...header('consumedOn')}>사용일</SortTH>
+              <TH />
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {rows.length === 0 && <EmptyRow colSpan={cols} />}
+            {paging.rows.map((r) => (
+              <TR key={r.id}>
+                <TD>{r.requestNo}</TD>
+                <TD>{adjustmentTypeLabels[r.type]}</TD>
+                {showAccount && (
+                  <TD>
+                    <Link className="text-primary hover:underline" to={`/loans/${r.accountId}`}>
+                      {r.accountNo}
+                    </Link>
+                  </TD>
+                )}
+                <TD>{describeRequest(r)}</TD>
+                <TD>{r.reason}</TD>
+                <TD>
+                  {r.requestedBy} · {formatDate(r.requestedOn)}
+                </TD>
+                <TD>{r.decidedBy ? `${r.decidedBy} · ${formatDate(r.decidedOn)}` : '-'}</TD>
+                <TD>
+                  <StatusBadge status={r.status} />
+                </TD>
+                <TD>{formatDate(r.consumedOn)}</TD>
+                <TD>
+                  {canApprove && r.status === 'REQUESTED' && r.requestedBy !== me?.loginId && (
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        disabled={decide.isPending}
+                        onClick={() => decide.mutate({ id: r.id, approve: true })}
+                      >
+                        승인
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={decide.isPending}
+                        onClick={() => decide.mutate({ id: r.id, approve: false })}
+                      >
+                        반려
+                      </Button>
+                    </div>
+                  )}
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { Link } from 'react-router'
 import type { z } from 'zod'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { PaymentView, UnmatchedDeposit } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/
 import { useInvalidateLoan } from '@/features/loans/hooks'
 import { formatDate, formatMoney } from '@/lib/format'
 import { unmatchedPaymentSchema } from '@/lib/schemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 type Input_ = z.input<typeof unmatchedPaymentSchema>
@@ -136,6 +138,7 @@ export function UnmatchedPage() {
     depositor: (d) => d.depositorName,
     bankTxId: (d) => d.bankTxId,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">미확인 입금</h1>
@@ -148,45 +151,47 @@ export function UnmatchedPage() {
         </CardContent>
       </Card>
       <ErrorMessage error={q.error} />
-      <p className="text-xs text-muted-foreground">
-        미처리 {q.data?.length ?? 0}건 · 잔액(가수금) {formatMoney(total)}
-      </p>
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('id')}>#</SortTH>
-            <SortTH {...header('valueDate')}>입금일(은행)</SortTH>
-            <SortTH {...header('businessDate')}>등록 업무일</SortTH>
-            <SortTH {...header('amount')} className="text-right">
-              금액
-            </SortTH>
-            <SortTH {...header('depositor')}>입금자</SortTH>
-            <SortTH {...header('bankTxId')}>거래고유번호</SortTH>
-            <TH />
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {sorted.map((d) => (
-            <TR key={d.id}>
-              <TD>{d.id}</TD>
-              <TD>{formatDate(d.valueDate)}</TD>
-              <TD>{formatDate(d.businessDate)}</TD>
-              <TD className="num">{formatMoney(d.amount)}</TD>
-              <TD>{d.depositorName ?? '-'}</TD>
-              <TD className="text-muted-foreground">{d.bankTxId}</TD>
-              <TD>
-                <div className="flex gap-1">
-                  <MatchDialog deposit={d} />
-                  <Button asChild size="sm" variant="outline">
-                    <Link to={`/payment-splits?unmatchedId=${d.id}&amount=${d.amount}`}>여러 계약에 배분</Link>
-                  </Button>
-                </div>
-              </TD>
+      <PagedList
+        paging={paging.props}
+        toolbar={<p className="text-xs text-muted-foreground">미처리 잔액(가수금) {formatMoney(total)}</p>}
+      >
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('id')}>#</SortTH>
+              <SortTH {...header('valueDate')}>입금일(은행)</SortTH>
+              <SortTH {...header('businessDate')}>등록 업무일</SortTH>
+              <SortTH {...header('amount')} className="text-right">
+                금액
+              </SortTH>
+              <SortTH {...header('depositor')}>입금자</SortTH>
+              <SortTH {...header('bankTxId')}>거래고유번호</SortTH>
+              <TH />
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.length === 0 && <EmptyRow colSpan={7} />}
+            {paging.rows.map((d) => (
+              <TR key={d.id}>
+                <TD>{d.id}</TD>
+                <TD>{formatDate(d.valueDate)}</TD>
+                <TD>{formatDate(d.businessDate)}</TD>
+                <TD className="num">{formatMoney(d.amount)}</TD>
+                <TD>{d.depositorName ?? '-'}</TD>
+                <TD className="text-muted-foreground">{d.bankTxId}</TD>
+                <TD>
+                  <div className="flex gap-1">
+                    <MatchDialog deposit={d} />
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/payment-splits?unmatchedId=${d.id}&amount=${d.amount}`}>여러 계약에 배분</Link>
+                    </Button>
+                  </div>
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { adjustmentTypeLabels, lifecycleApi, lifecycleKeys, type Lifecycle } from '@/api/lifecycle'
 import type { LoanDetail } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/t
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatMoney, statusLabel } from '@/lib/format'
 import { ADJUSTMENT_TYPES, adjustmentRequestSchema, saleSchema, transferSchema } from '@/lib/lifecycleSchemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { ReasonDialog, RequestsTable, useInvalidateLifecycle } from './shared'
 
@@ -238,47 +240,50 @@ function SalesCard({ info }: { info: Lifecycle }) {
     status: (s) => statusLabel(s.status),
     repurchasedOn: (s) => s.repurchasedOn,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
         <CardTitle>매각·환매 이력</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('soldOn')}>매각일</SortTH>
-              <SortTH {...header('buyer')}>양수인</SortTH>
-              <SortTH {...header('salePrice')} className="text-right">
-                매각가
-              </SortTH>
-              <SortTH {...header('noticeSentOn')}>양도 통지</SortTH>
-              <SortTH {...header('deadline')}>환매 마감</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <SortTH {...header('repurchasedOn')}>환매</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {info.sales.length === 0 && <EmptyRow colSpan={7} />}
-            {sorted.map((s) => (
-              <TR key={s.id}>
-                <TD>{formatDate(s.soldOn)}</TD>
-                <TD>{s.buyer}</TD>
-                <TD className="num">{formatMoney(s.salePrice)}</TD>
-                <TD>{formatDate(s.noticeSentOn)}</TD>
-                <TD>{formatDate(s.repurchaseDeadline)}</TD>
-                <TD>
-                  <StatusBadge status={s.status} />
-                </TD>
-                <TD>
-                  {s.repurchasedOn
-                    ? `${formatDate(s.repurchasedOn)} · ${formatMoney(s.repurchasePrice)} · ${s.repurchaseReason ?? ''}`
-                    : '-'}
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('soldOn')}>매각일</SortTH>
+                <SortTH {...header('buyer')}>양수인</SortTH>
+                <SortTH {...header('salePrice')} className="text-right">
+                  매각가
+                </SortTH>
+                <SortTH {...header('noticeSentOn')}>양도 통지</SortTH>
+                <SortTH {...header('deadline')}>환매 마감</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <SortTH {...header('repurchasedOn')}>환매</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {info.sales.length === 0 && <EmptyRow colSpan={7} />}
+              {paging.rows.map((s) => (
+                <TR key={s.id}>
+                  <TD>{formatDate(s.soldOn)}</TD>
+                  <TD>{s.buyer}</TD>
+                  <TD className="num">{formatMoney(s.salePrice)}</TD>
+                  <TD>{formatDate(s.noticeSentOn)}</TD>
+                  <TD>{formatDate(s.repurchaseDeadline)}</TD>
+                  <TD>
+                    <StatusBadge status={s.status} />
+                  </TD>
+                  <TD>
+                    {s.repurchasedOn
+                      ? `${formatDate(s.repurchasedOn)} · ${formatMoney(s.repurchasePrice)} · ${s.repurchaseReason ?? ''}`
+                      : '-'}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
@@ -298,42 +303,45 @@ function SetoffsCard({ info }: { info: Lifecycle }) {
     source: (s) => (s.source ? setoffSource(s.source) : null),
     status: (s) => statusLabel(s.status),
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
         <CardTitle>상계 내역 (R44)</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('id')}>#</SortTH>
-              <SortTH {...header('direction')}>방향</SortTH>
-              <SortTH {...header('date')}>상계일</SortTH>
-              <SortTH {...header('amount')} className="text-right">
-                금액
-              </SortTH>
-              <SortTH {...header('counterpart')}>상대 계약</SortTH>
-              <SortTH {...header('source')}>원천</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {sorted.map((s) => (
-              <TR key={s.eventId}>
-                <TD>{s.eventId}</TD>
-                <TD>{setoffDirection(s.direction)}</TD>
-                <TD>{formatDate(s.date)}</TD>
-                <TD className="num">{formatMoney(s.amount)}</TD>
-                <TD>{s.counterpartAccountNo ?? '-'}</TD>
-                <TD>{setoffSource(s.source)}</TD>
-                <TD>
-                  <StatusBadge status={s.status} />
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('id')}>#</SortTH>
+                <SortTH {...header('direction')}>방향</SortTH>
+                <SortTH {...header('date')}>상계일</SortTH>
+                <SortTH {...header('amount')} className="text-right">
+                  금액
+                </SortTH>
+                <SortTH {...header('counterpart')}>상대 계약</SortTH>
+                <SortTH {...header('source')}>원천</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {paging.rows.map((s) => (
+                <TR key={s.eventId}>
+                  <TD>{s.eventId}</TD>
+                  <TD>{setoffDirection(s.direction)}</TD>
+                  <TD>{formatDate(s.date)}</TD>
+                  <TD className="num">{formatMoney(s.amount)}</TD>
+                  <TD>{s.counterpartAccountNo ?? '-'}</TD>
+                  <TD>{setoffSource(s.source)}</TD>
+                  <TD>
+                    <StatusBadge status={s.status} />
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
