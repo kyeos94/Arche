@@ -16,9 +16,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Input, Select, Textarea } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { StaffRoleDialog } from './StaffRoleDialog'
 
 type Filter = 'ACTIVE' | 'RESIGNED' | 'ALL'
@@ -61,6 +62,15 @@ function StaffList() {
   const rows = (staff.data ?? [])
     .filter((s) => (filter === 'ALL' ? true : filter === 'ACTIVE' ? s.enabled : !s.enabled))
     .filter((s) => !q || s.name.includes(q) || s.loginId.includes(q) || teamName(s.teamId).includes(q))
+  const { sorted, header } = useSort(rows, {
+    id: (s) => s.id,
+    loginId: (s) => s.loginId,
+    name: (s) => s.name,
+    role: (s) => s.roleLabel,
+    team: (s) => teamName(s.teamId),
+    failed: (s) => s.failedAttempts,
+    status: (s) => (!s.enabled ? 2 : s.locked ? 1 : 0),
+  })
   const activeCount = staff.data?.filter((s) => s.enabled).length ?? 0
   const resignedCount = (staff.data?.length ?? 0) - activeCount
   const lockedReason = (s: StaffRow) =>
@@ -93,19 +103,19 @@ function StaffList() {
         <Table>
           <THead>
             <TR>
-              <TH>ID</TH>
-              <TH>아이디</TH>
-              <TH>이름</TH>
-              <TH>역할</TH>
-              <TH>팀</TH>
-              <TH>로그인 실패</TH>
-              <TH>상태</TH>
+              <SortTH {...header('id')}>ID</SortTH>
+              <SortTH {...header('loginId')}>아이디</SortTH>
+              <SortTH {...header('name')}>이름</SortTH>
+              <SortTH {...header('role')}>역할</SortTH>
+              <SortTH {...header('team')}>팀</SortTH>
+              <SortTH {...header('failed')}>로그인 실패</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
               <TH />
             </TR>
           </THead>
           <TBody>
             {staff.data && rows.length === 0 && <EmptyRow colSpan={8}>해당하는 직원이 없습니다</EmptyRow>}
-            {rows.map((s) => (
+            {sorted.map((s) => (
               <TR key={s.id} className={s.enabled ? undefined : 'text-muted-foreground'}>
                 <TD>{s.id}</TD>
                 <TD>{s.loginId}</TD>

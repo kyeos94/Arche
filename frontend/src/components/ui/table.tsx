@@ -1,5 +1,6 @@
 import type * as React from 'react'
 import { cn } from '@/lib/utils'
+import type { SortHeaderProps } from '@/lib/useSort'
 
 export function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
@@ -27,6 +28,44 @@ export function TH({ className, ...props }: React.ComponentProps<'th'>) {
       className={cn('h-7 px-2 text-left align-middle font-medium whitespace-nowrap text-muted-foreground', className)}
       {...props}
     />
+  )
+}
+
+/**
+ * 눌러서 정렬하는 머리글 (ADR 0011). useSort().header(key) 또는 서버 정렬 상태를 그대로 넘긴다.
+ * 오름차순 ▲, 내림차순 ▼, 정렬하지 않으면 흐린 ↕. 스크린리더에는 aria-sort로 알린다.
+ */
+export function SortTH({
+  sortKey,
+  sort,
+  onSort,
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<'th'>, 'onClick'> & SortHeaderProps) {
+  const active = sort?.key === sortKey ? sort.direction : null
+  const right = className?.includes('text-right')
+  return (
+    <th
+      aria-sort={active === 'asc' ? 'ascending' : active === 'desc' ? 'descending' : 'none'}
+      className={cn('h-7 px-2 text-left align-middle font-medium whitespace-nowrap text-muted-foreground', className)}
+      {...props}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          'inline-flex items-center gap-0.5 hover:text-foreground',
+          right && 'flex-row-reverse',
+          active && 'text-foreground',
+        )}
+      >
+        {children}
+        <span aria-hidden className={cn('text-[10px]', !active && 'opacity-30')}>
+          {active === 'asc' ? '▲' : active === 'desc' ? '▼' : '↕'}
+        </span>
+      </button>
+    </th>
   )
 }
 
