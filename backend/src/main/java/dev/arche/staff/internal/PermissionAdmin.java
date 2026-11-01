@@ -277,6 +277,7 @@ class PermissionAdminService implements SmartInitializingSingleton {
 		m.put(Permission.COLLECTION_STOP, "추심 중지 등록·해제");
 		m.put(Permission.APPLICATION_ASSIGN, "심사자 배정·심사자 프로필 관리");
 		m.put(Permission.BROKER_MANAGE, "중개업자 관리");
+		m.put(Permission.DOCUMENT_PRINT, "양식 인쇄 (독촉장·통보서)");
 		return Map.copyOf(m);
 	}
 }

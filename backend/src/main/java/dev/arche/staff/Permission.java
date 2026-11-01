@@ -66,7 +66,9 @@ public enum Permission {
 	/** 심사자 수동 배정·재배정, 심사자 프로필(담당 상품·부재) 관리 (R55) */
 	APPLICATION_ASSIGN("application.assign", UNDERWRITING_LEAD, HEAD),
 	/** 중개업자 등록·API 키·수수료율 관리, 불완전판매 환수·환수 점검 (R56) */
-	BROKER_MANAGE("broker.manage", UNDERWRITING_LEAD, HEAD);
+	BROKER_MANAGE("broker.manage", UNDERWRITING_LEAD, HEAD),
+	/** 양식(변제 독촉장·기한이익상실 통보서) 인쇄 (R72). 데이터 범위는 계약 조회와 같음 */
+	DOCUMENT_PRINT("document.print", COLLECTOR, COLLECTION_LEAD, HEAD);
 
 	private final String code;
 	private final Set<Role> roles;

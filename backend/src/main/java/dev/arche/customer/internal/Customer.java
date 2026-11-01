@@ -61,6 +61,11 @@ class Customer extends BaseEntity {
 		return residentNo;
 	}
 
+	/** 주소 원문 (양식·우편용, R72). 화면 목록에는 쓰지 않는다 */
+	String address() {
+		return address;
+	}
+
 	String phone() {
 		return phone;
 	}

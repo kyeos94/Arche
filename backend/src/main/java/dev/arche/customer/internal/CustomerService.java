@@ -113,6 +113,14 @@ class CustomerService implements Customers {
 		return c.residentNo();
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public String mailingAddress(long id, String purpose) {
+		Customer c = find(id);
+		accessLog.log("CUSTOMER_ADDRESS_USE", "CUSTOMER", String.valueOf(id), purpose);
+		return c.address() == null ? "" : c.address();
+	}
+
 	private Customer find(long id) {
 		return customers.findById(id).orElseThrow(() -> new BusinessException("CUSTOMER_NOT_FOUND", "고객이 없습니다"));
 	}

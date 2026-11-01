@@ -43,6 +43,7 @@ class PermissionMatrixTest {
 			COLLECTION_STOP            | - - - O - O -
 			APPLICATION_ASSIGN         | - O - - - O -
 			BROKER_MANAGE              | - O - - - O -
+			DOCUMENT_PRINT             | - - O O - O -
 			""")
 	void 정책서_9_1_권한표와_같다(Permission permission, String row) {
 		List<String> marks = Arrays.asList(row.trim().split("\\s+"));

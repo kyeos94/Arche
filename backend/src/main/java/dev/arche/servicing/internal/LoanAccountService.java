@@ -507,6 +507,35 @@ class LoanAccountService implements LoanAccounts {
 		return messaging(find(accountId));
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public DocumentView documentView(long accountId) {
+		LoanAccount a = find(accountId);
+		LocalDate today = businessDates.today();
+		var terms = replayer.terms(a);
+		SimulationResult r = replayer.simulate(a, terms, List.of(), today);
+		DueSnapshot due = dueSnapshot(a, r, today);
+		List<dev.arche.servicing.engine.Installment> overdue = r.installments().stream()
+				.filter(i -> i.status() == dev.arche.servicing.engine.InstallmentStatus.OVERDUE).toList();
+		Money overduePrincipal = overdue.stream().map(i -> i.principalDue().minus(i.principalPaid()))
+				.reduce(Money.ZERO, Money::plus);
+		var notice = r.notices().stream()
+				.filter(n -> n.status() != dev.arche.servicing.engine.NoticeStatus.VOID
+						&& n.status() != dev.arche.servicing.engine.NoticeStatus.CANCELLED)
+				.reduce((first, second) -> second).orElse(null);
+		return new DocumentView(a.getId(), a.accountNo(), a.customerId(), a.productCode(), r.status().name(),
+				a.disbursedOn(), a.initialPrincipal(), terms.rateAt(today), r.principalBalance(), overduePrincipal,
+				r.outstandingNormalInterest(), r.outstandingLateInterest(), r.cost(), r.suspense(), due.overdue(),
+				r.payoffAmount(), r.delinquentSince(), r.delinquencyDays(), overdue.size(),
+				overdue.stream().map(dev.arche.servicing.engine.Installment::dueDate).min(LocalDate::compareTo)
+						.orElse(null),
+				due.nextDueDate(), r.acceleratedOn(), notice == null ? null : notice.status().name(),
+				notice == null ? null : notice.reasonDate(), notice == null ? null : notice.sentOn(),
+				notice == null ? null
+						: (notice.actualArrivalOn() != null ? notice.actualArrivalOn() : notice.deemedArrivalOn()),
+				notice == null ? null : notice.accelerationDate(), a.virtualAccountNo(), a.assignedStaffId(), today);
+	}
+
 	private MessagingView messaging(LoanAccount a) {
 		List<InstallmentRow> current = installments.findByAccountIdAndScheduleVersionOrderBySeq(a.getId(),
 				a.scheduleVersion());

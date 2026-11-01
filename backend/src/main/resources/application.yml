@@ -64,6 +64,12 @@ arche:
     clawback-cron: "0 30 23 * * *"
     # 심사자 배정 전략: least-loaded(정책서 7장 기본) 또는 round-robin
     assignment-strategy: ${ARCHE_ASSIGNMENT_STRATEGY:least-loaded}
+  # 양식에 찍는 회사 정보 (가상 값, R72)
+  company:
+    name: 예시대부(가상)
+    address: 가상시 예시구 샘플로 123 (가상 주소)
+    phone: 0000-0000
+    registration-no: 가상-2026-0001
   demo:
     # 데모 직원(역할별 1명)과 G11·G27·G28 재현용 계약을 만든다. 운영에서는 false
     enabled: ${ARCHE_DEMO:true}

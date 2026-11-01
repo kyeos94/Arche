@@ -96,6 +96,25 @@ public interface LoanAccounts {
 
 	MessagingView messagingView(long accountId);
 
+	/**
+	 * 양식(변제 독촉장·기한이익상실 통보서)에 채울 계약 값 (R72). 업무일자 기준으로 재생한 값이다.
+	 *
+	 * @param overdueAmount  지금 갚아야 할 금액 (R47과 같은 기준: 상실·만기 경과·매입채권은 완제 금액)
+	 * @param noticeStatus   가장 최근 기한이익상실 통지의 상태 (PENDING·EXECUTED 등), 없으면 null
+	 */
+	record DocumentView(long id, String accountNo, long customerId, String productCode, String status,
+			LocalDate disbursedOn, Money initialPrincipal, InterestRate currentRate, Money principalBalance,
+			Money overduePrincipal, Money unpaidNormalInterest, Money lateInterest, Money cost, Money suspense,
+			Money overdueAmount, Money payoffAmount, @Nullable LocalDate delinquentSince, long delinquencyDays,
+			int overdueInstallments, @Nullable LocalDate oldestOverdueDueDate, @Nullable LocalDate nextDueDate,
+			@Nullable LocalDate acceleratedOn, @Nullable String noticeStatus, @Nullable LocalDate noticeReasonDate,
+			@Nullable LocalDate noticeSentOn, @Nullable LocalDate noticeArrivalOn,
+			@Nullable LocalDate noticeAccelerationDate, @Nullable String virtualAccountNo,
+			@Nullable Long assignedStaffId, LocalDate asOf) {
+	}
+
+	DocumentView documentView(long accountId);
+
 	// ------------------------------------------------------------------ 입금 배분·대위변제·법조치 (R47~R52)
 
 	/**

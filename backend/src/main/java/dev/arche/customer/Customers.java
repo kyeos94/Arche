@@ -54,6 +54,11 @@ public interface Customers {
 	 */
 	String residentNoForCreditInquiry(long id, String consentRef);
 
+	/**
+	 * 우편물·양식에 찍을 주소 원문 (R72). 용도를 받아 접근 기록에 남긴다. 주소가 없으면 빈 문자열
+	 */
+	String mailingAddress(long id, String purpose);
+
 	/** 식별번호 원문 조회 (고객 식별번호 원문 조회 권한 + 사유, 접근 기록) */
 	String revealResidentNo(long id, String reason);
 }

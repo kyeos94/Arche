@@ -29,10 +29,12 @@ class CollectionContactsService implements CollectionContacts {
 	private final StaffDirectory staff;
 	private final BusinessDates businessDates;
 	private final Clock clock;
+	private final CollectionStopService stops;
 
 	CollectionContactsService(ContactService contacts, ContactLogRepository logs, DeferralService deferrals,
 			AutoMessageService autoMessages, LoanAccounts accounts, StaffDirectory staff, BusinessDates businessDates,
-			Clock clock) {
+			Clock clock, CollectionStopService stops) {
+		this.stops = stops;
 		this.contacts = contacts;
 		this.logs = logs;
 		this.deferrals = deferrals;
@@ -67,6 +69,12 @@ class CollectionContactsService implements CollectionContacts {
 		}
 		return deferrals.activeOn(accountId, date)
 				.map(d -> "연락 유예 중입니다 (" + d.startDate() + " ~ " + d.endDate() + ", " + d.reason() + ")");
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<String> collectionStopReason(long accountId) {
+		return Optional.ofNullable(stops.blockReason(accountId));
 	}
 
 	@Override

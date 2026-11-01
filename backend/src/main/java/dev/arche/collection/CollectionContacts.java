@@ -33,6 +33,9 @@ public interface CollectionContacts {
 	/** 지금 추심 연락을 막는 사유(소멸시효 완성·연락 유예). 예약 문자를 보내기 직전에 다시 본다 */
 	Optional<String> blockingReason(long accountId, LocalDate date);
 
+	/** 추심 중지(사망·회생·파산·공적 채무조정, R45) 중이면 그 사유 */
+	Optional<String> collectionStopReason(long accountId);
+
 	/** 그날 남은 추심 연락 가능 횟수 */
 	int remaining(long accountId, LocalDate date);
 
