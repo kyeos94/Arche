@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
+import { GlobalSearch } from '@/components/GlobalSearch'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth'
@@ -55,6 +56,7 @@ export function Layout() {
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          {can('loan.read') && <GlobalSearch />}
           <span className="mr-1">
             {me?.name} · {me?.roleLabel}
           </span>

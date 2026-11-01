@@ -18,6 +18,7 @@ import dev.arche.servicing.engine.LoanEvent;
 import dev.arche.servicing.engine.ScheduleMath;
 import dev.arche.servicing.engine.SimulationResult;
 import dev.arche.staff.DataScope;
+import dev.arche.staff.AccessLogger;
 import dev.arche.staff.CurrentStaff;
 import dev.arche.staff.Permission;
 import dev.arche.staff.StaffDirectory;
@@ -174,12 +175,13 @@ class LoanController {
 	private final Customers customers;
 	private final ProductCatalog products;
 	private final StaffDirectory staff;
+	private final AccessLogger accessLog;
 	private final BusinessDates businessDates;
 
 	LoanController(LoanAccountRepository accounts, RateTermRepository rateTerms, DueDayTermRepository dueDayTerms,
 			InstallmentRepository installments, LedgerEntryRepository ledger, AccelerationNoticeRepository notices,
 			AccountEventRepository events, AcquisitionRepository acquisitions, AccountReplayer replayer,
-			LoanAccountService service, LimitationService limitationService, Customers customers, ProductCatalog products, StaffDirectory staff,
+			LoanAccountService service, LimitationService limitationService, Customers customers, AccessLogger accessLog, ProductCatalog products, StaffDirectory staff,
 			BusinessDates businessDates) {
 		this.accounts = accounts;
 		this.rateTerms = rateTerms;
@@ -195,6 +197,7 @@ class LoanController {
 		this.customers = customers;
 		this.products = products;
 		this.staff = staff;
+		this.accessLog = accessLog;
 		this.businessDates = businessDates;
 	}
 
@@ -241,6 +244,62 @@ class LoanController {
 			counts.put((String) row[0], (Long) row[1]);
 		}
 		return counts;
+	}
+
+	// ------------------------------------------------------------------ 통합 검색 (상단 검색창)
+
+	record SearchHit(long id, String accountNo, String customerName, String residentNoMasked, String phoneMasked,
+			String productCode, String status, long principalBalance, String matchedBy) {
+	}
+
+	static final int SEARCH_LIMIT = 20;
+
+	/**
+	 * 계약번호(L로 시작하거나 숫자) 부분 일치, 주민등록번호·휴대폰번호 블라인드 인덱스 일치, 고객 이름 부분 일치.
+	 * 조회 범위(담당 건 / 팀 전체) 안의 계약만, 최대 20건. 주민등록번호·휴대폰 검색은 접근 기록에 남긴다(입력값은 남기지 않음)
+	 */
+	@GetMapping("/search")
+	@PreAuthorize("hasAuthority('loan.read')")
+	@Transactional(readOnly = true)
+	List<SearchHit> search(@RequestParam String q) {
+		String query = q == null ? "" : q.trim();
+		if (query.isEmpty()) {
+			return List.of();
+		}
+		DataScope scope = staff.loanScope();
+		Customers.SearchKind kind = Customers.kindOf(query);
+		Map<Long, SearchHit> hits = new LinkedHashMap<>();
+		if (kind == Customers.SearchKind.NAME && query.matches("[Ll]?[0-9]+")) {
+			for (LoanAccount a : accounts.findTop50ByAccountNoContainingOrderByIdDesc(query.toUpperCase())) {
+				addHit(hits, scope, a, customers.get(a.customerId()), "계약번호");
+			}
+		} else {
+			if (kind != Customers.SearchKind.NAME) {
+				accessLog.log("CUSTOMER_SEARCH", "CUSTOMER", null,
+						kind == Customers.SearchKind.RESIDENT_NO ? "주민등록번호 검색" : "휴대폰번호 검색");
+			}
+			Map<Long, CustomerView> found = new LinkedHashMap<>();
+			customers.search(query).forEach(c -> found.put(c.id(), c));
+			String matchedBy = switch (kind) {
+				case RESIDENT_NO -> "주민등록번호";
+				case PHONE -> "휴대폰번호";
+				case NAME -> "이름";
+			};
+			if (!found.isEmpty()) {
+				for (LoanAccount a : accounts.findTop50ByCustomerIdInOrderByIdDesc(found.keySet())) {
+					addHit(hits, scope, a, found.get(a.customerId()), matchedBy);
+				}
+			}
+		}
+		return hits.values().stream().limit(SEARCH_LIMIT).toList();
+	}
+
+	private static void addHit(Map<Long, SearchHit> hits, DataScope scope, LoanAccount a, CustomerView c,
+			String matchedBy) {
+		if (scope.allows(a.assignedStaffId())) {
+			hits.putIfAbsent(a.getId(), new SearchHit(a.getId(), a.accountNo(), c.name(), c.residentNoMasked(),
+					c.phoneMasked(), a.productCode(), a.status().name(), a.principalBalance(), matchedBy));
+		}
 	}
 
 	// ------------------------------------------------------------------ 상세

@@ -30,6 +30,9 @@ class Customer extends BaseEntity {
 	@Column(name = "phone_enc")
 	private String phone;
 
+	@Column(name = "phone_bidx", columnDefinition = "bpchar(64)")
+	private String phoneBlindIndex;
+
 	@Convert(converter = EncryptedStringConverter.class)
 	@Column(name = "address_enc")
 	private String address;
@@ -38,8 +41,9 @@ class Customer extends BaseEntity {
 	}
 
 	Customer(String customerNo, String name, String residentNo, String residentNoBlindIndex, LocalDate birthDate,
-			String phone, String address) {
+			String phone, String phoneBlindIndex, String address) {
 		this.customerNo = customerNo;
+		this.phoneBlindIndex = phoneBlindIndex;
 		this.name = name;
 		this.residentNo = residentNo;
 		this.residentNoBlindIndex = residentNoBlindIndex;
@@ -55,6 +59,14 @@ class Customer extends BaseEntity {
 
 	String residentNo() {
 		return residentNo;
+	}
+
+	String phone() {
+		return phone;
+	}
+
+	void indexPhone(String blindIndex) {
+		this.phoneBlindIndex = blindIndex;
 	}
 
 	/** 개인정보를 출력하지 않는다 */

@@ -187,6 +187,19 @@ export interface History {
   }[]
 }
 
+/** 상단 통합 검색 결과 */
+export interface SearchHit {
+  id: number
+  accountNo: string
+  customerName: string
+  residentNoMasked: string
+  phoneMasked: string | null
+  productCode: string
+  status: string
+  principalBalance: number
+  matchedBy: string
+}
+
 /** 소멸시효 (G13) */
 export interface LimitationInfo {
   start: string | null

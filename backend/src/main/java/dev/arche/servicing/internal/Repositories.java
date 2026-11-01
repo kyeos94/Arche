@@ -31,6 +31,10 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 
 	List<LoanAccount> findByPaidOffOn(LocalDate paidOffOn);
 
+	List<LoanAccount> findTop50ByAccountNoContainingOrderByIdDesc(String accountNo);
+
+	List<LoanAccount> findTop50ByCustomerIdInOrderByIdDesc(Collection<Long> customerIds);
+
 	/**
 	 * 일마감 판정 대상: 판정일까지 실행(양수)된 열린 계약 중 아직 그날까지 재생하지 않은 것.
 	 * 실행일이 판정일보다 늦은 계약은 재생할 수 없고, 이미 더 뒤까지 재생한 계약을 되돌리지 않는다.

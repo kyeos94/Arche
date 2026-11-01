@@ -19,6 +19,7 @@ import type {
   Product,
   Quote,
   WorkoutQuote,
+  SearchHit,
   LimitationInfo,
   Contacts,
   ContactChannel,
@@ -132,6 +133,7 @@ export const endpoints = {
   workoutQuote: (id: number, body: Omit<WorkoutRequest, 'reason'>) =>
     api.get<WorkoutQuote>(`/api/loans/${id}/workout-quote${qs({ ...body })}`),
   workout: (id: number, body: WorkoutRequest) => api.post<AccountRef>(`/api/loans/${id}/workouts`, body),
+  search: (q: string) => api.get<SearchHit[]>(`/api/loans/search${qs({ q })}`),
   limitation: (id: number) => api.get<LimitationInfo>(`/api/loans/${id}/limitation`),
   recordLimitationEvent: (id: number, body: { type: string; date: string; memo?: string }) =>
     api.post<LimitationInfo>(`/api/loans/${id}/limitation-events`, body),
