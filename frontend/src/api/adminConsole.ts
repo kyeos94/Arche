@@ -61,3 +61,35 @@ export const adminConsole = {
   permissionChanges: (limit = 100) =>
     api.get<PermissionChange[]>(`/api/admin/permissions/changes${qs({ limit })}`),
 }
+
+/** 직원 역할·팀 변경 (R71) */
+export interface RoleOptions {
+  roles: { code: string; label: string }[]
+  teams: { id: number; name: string }[]
+}
+
+export interface StaffRoleChange {
+  id: number
+  staffId: number
+  loginId: string
+  staffName: string
+  fromRole: string
+  toRole: string
+  fromTeam: string | null
+  toTeam: string | null
+  changedBy: string
+  changedAt: string
+  reason: string
+}
+
+export const staffRoleKeys = {
+  options: ['admin', 'staff', 'role-options'] as const,
+  changes: ['admin', 'staff', 'role-changes'] as const,
+}
+
+export const staffRoles = {
+  options: () => api.get<RoleOptions>('/api/admin/staff/role-options'),
+  change: (id: number, body: { role: string; teamId: number; reason: string }) =>
+    api.post<StaffRoleChange[]>(`/api/admin/staff/${id}/role`, body),
+  changes: () => api.get<StaffRoleChange[]>('/api/admin/staff/role-changes'),
+}
