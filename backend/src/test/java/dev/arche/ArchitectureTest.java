@@ -30,7 +30,7 @@ class ArchitectureTest {
 
 	@Test
 	void 다른_모듈의_Repository를_직접_참조하지_않는다() {
-		for (String module : new String[] { "calendar", "collection", "customer", "origination", "operation", "payment",
+		for (String module : new String[] { "calendar", "collection", "customer", "origination", "operation", "payment", "reporting",
 				"product", "servicing", "staff" }) {
 			noClasses().that().resideOutsideOfPackage("dev.arche." + module + "..")
 					.should().dependOnClassesThat(com.tngtech.archunit.base.DescribedPredicate.and(
