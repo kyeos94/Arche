@@ -37,7 +37,7 @@ public sealed interface LoanEvent {
 
 	/**
 	 * 상각 확정 (R39). 확정일까지 이자를 정산한 뒤 장부에서 제거한 금액을 CHARGE_OFF로 남긴다. 채권은 존속하며 확정일부터
-	 * 이자를 붙이지 않는다. 그날의 입금을 먼저 충당한 뒤 처리한다
+	 * 이자를 붙이지 않는다. 그날 입금보다 먼저 처리하므로 확정일 당일 입금은 상각 후 회수다
 	 */
 	record ChargeOff(String ref, LocalDate on) implements LoanEvent {
 	}

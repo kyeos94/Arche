@@ -95,4 +95,16 @@ public interface LoanAccounts {
 	java.util.List<MessagingView> messagingViews(LocalDate paidOffOn);
 
 	MessagingView messagingView(long accountId);
+
+	/** 같은 고객의 완제·매각되지 않은 계약 (주어진 계약 포함). 추심 중지는 채무자 단위 (R45) */
+	java.util.List<AccountRef> sameCustomerOpenAccounts(long accountId);
+
+	/** 이자 부과 중단 시작 (R46 개인회생·파산). 과거 날짜면 소급 재계산. 재생 이벤트 id를 돌려준다 */
+	long suspendInterest(long accountId, LocalDate from, String reason);
+
+	/** 이자 부과 중단을 on 당일로 끝낸다 (그날부터 다시 이자, R46) */
+	void endInterestSuspension(long accountId, long eventId, LocalDate on);
+
+	/** 조정 금리 적용 (R46 공적 채무조정 확정): 현재 적용 이율 이하만, 재산출은 R20 */
+	AccountRef lowerRate(long accountId, InterestRate rate, LocalDate validFrom, String reason);
 }

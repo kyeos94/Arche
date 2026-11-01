@@ -359,10 +359,16 @@ public final class LoanSimulator {
 					post(d, PostingType.COST_CHARGE, c.ref(), c.amount()).add();
 				}
 			}
-			// 환매·매각은 그날 입금보다 먼저: 매각일(포함) 이후 입금은 이전 대상, 환매일 입금은 되살린 잔액에 충당 (R40·R41)
+			// 환매·상각·매각은 그날 입금보다 먼저 (R39~R41): 상각일 입금은 상각 후 회수, 매각일(포함) 이후 입금은 이전 대상,
+			// 환매일 입금은 되살린 잔액에 충당. 같은 날 상각 후 매각도 이 순서
 			for (LoanEvent.Repurchase r : repurchases) {
 				if (r.on().equals(d)) {
 					repurchase(d, r);
+				}
+			}
+			for (LoanEvent.ChargeOff c : chargeOffs) {
+				if (c.on().equals(d)) {
+					chargeOff(d, c);
 				}
 			}
 			for (LoanEvent.Sale s : sales) {
@@ -402,7 +408,7 @@ public final class LoanSimulator {
 					changeDueDay(c);
 				}
 			}
-			// 하루 끝: 수기 조정·상계 원천·양수인 이전·상각 (그날 입금을 반영한 잔액 기준)
+			// 하루 끝: 수기 조정·상계 원천·양수인 이전 (그날 입금을 반영한 잔액 기준)
 			for (LoanEvent.Adjustment a : adjustments) {
 				if (a.on().equals(d)) {
 					adjust(d, a);
@@ -416,11 +422,6 @@ public final class LoanSimulator {
 			for (LoanEvent.BuyerTransfer t : buyerTransfers) {
 				if (t.on().equals(d)) {
 					transferToBuyer(d, t);
-				}
-			}
-			for (LoanEvent.ChargeOff c : chargeOffs) {
-				if (c.on().equals(d)) {
-					chargeOff(d, c);
 				}
 			}
 		}

@@ -71,12 +71,13 @@ class AccountReplayer {
 	}
 
 	LoanTerms terms(LoanAccount a) {
-		if (a.repaymentMethod() == RepaymentMethod.ACQUIRED) {
-			AcquisitionRow acq = acquisitions.findByAccountId(a.getId()).orElseThrow();
-			return LoanTerms.acquired(a.initialPrincipal(), acq.toEngine());
-		}
 		List<RatePeriod> periods = rateTerms.findByAccountIdOrderByValidFrom(a.getId()).stream()
 				.map(t -> new RatePeriod(t.validFrom(), t.rate())).toList();
+		if (a.repaymentMethod() == RepaymentMethod.ACQUIRED) {
+			AcquisitionRow acq = acquisitions.findByAccountId(a.getId()).orElseThrow();
+			// 양수일 뒤 금리 이력만 적용이율을 바꾼다 (R46 공적 채무조정)
+			return LoanTerms.acquired(a.initialPrincipal(), acq.toEngine()).withRatePeriods(periods);
+		}
 		int dueDay = initialDueDay(a);
 		return new LoanTerms(a.repaymentMethod(), a.initialPrincipal(), a.disbursedOn(), a.termMonths(),
 				a.graceMonths(), dueDay, periods, a.prepaymentFeeRate(), null);

@@ -49,7 +49,13 @@ public enum Permission {
 	/** 추심 연락 기록·분할납부 약속 등록 (R37) */
 	COLLECTION_ACTIVITY("collection.activity", COLLECTOR, COLLECTION_LEAD, HEAD),
 	/** 소멸시효 중단 사유(지급명령·압류·판결 확정) 기록 (R37) */
-	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD);
+	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD),
+	/** 수기 조정·상계·상태 되돌리기 요청 (R42~R44) */
+	LOAN_ADJUST_REQUEST("loan.adjust.request", COLLECTION_LEAD, HEAD),
+	/** 수기 조정·상계·상태 되돌리기 승인 (R42~R44, 작성자 ≠ 승인자) */
+	LOAN_ADJUST_APPROVE("loan.adjust.approve", HEAD),
+	/** 추심 중지 등록·해제 (R45·R46) */
+	COLLECTION_STOP("collection.stop", COLLECTION_LEAD, HEAD);
 
 	private final String code;
 	private final Set<Role> roles;

@@ -31,6 +31,12 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 
 	List<LoanAccount> findByPaidOffOn(LocalDate paidOffOn);
 
+	/** 상각 후보 산출 (R39) */
+	@Query("select a from LoanAccount a where a.status = :status order by a.id")
+	List<LoanAccount> findByStatusValue(@Param("status") String status);
+
+	List<LoanAccount> findByCustomerIdOrderById(long customerId);
+
 	List<LoanAccount> findTop50ByAccountNoContainingOrderByIdDesc(String accountNo);
 
 	List<LoanAccount> findTop50ByCustomerIdInOrderByIdDesc(Collection<Long> customerIds);
@@ -95,8 +101,11 @@ interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> {
 	@EntityGraph(attributePaths = "allocations")
 	List<LedgerEntry> findByAccountIdOrderById(long accountId);
 
+	/** 원금 감소 합계. 상각(R39)은 청구 잔액을 줄이지 않는 메모 거래라 뺀다 (그 역분개도) */
 	@Query("select coalesce(sum(e.principal), 0) from LedgerEntry e where e.accountId = :accountId"
-			+ " and e.type not in ('DISBURSE', 'ACQUIRE')")
+			+ " and e.type not in ('DISBURSE', 'ACQUIRE', 'CHARGE_OFF')"
+			+ " and not (e.type = 'REVERSAL' and exists (select 1 from LedgerEntry o where o.id = e.reversalOfId"
+			+ " and o.type = 'CHARGE_OFF'))")
 	long sumPrincipalRepaid(@Param("accountId") long accountId);
 
 	@Query("select coalesce(sum(e.suspense), 0) from LedgerEntry e where e.accountId = :accountId")

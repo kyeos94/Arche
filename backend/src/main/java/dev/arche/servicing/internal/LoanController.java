@@ -409,12 +409,13 @@ class LoanController {
 		LoanAccount a = visible(id);
 		LocalDate today = businessDates.today();
 		SimulationResult r = replayer.simulate(a, replayer.terms(a), List.of(), today);
-		if (r.status() == AccountStatus.PAID_OFF) {
-			throw new BusinessException("ACCOUNT_CLOSED", "완제된 계약입니다");
+		if (r.status() == AccountStatus.PAID_OFF || r.status() == AccountStatus.SOLD) {
+			throw new BusinessException("ACCOUNT_CLOSED", "완제·매각된 계약입니다");
 		}
 		long overdue = r.installments().stream().filter(i -> !i.dueDate().isAfter(today))
 				.mapToLong(i -> i.principalDue().minus(i.principalPaid()).won()).sum();
-		boolean dueAll = r.status() == AccountStatus.ACCELERATED || a.repaymentMethod().settlesOnPayment()
+		boolean dueAll = r.status() == AccountStatus.ACCELERATED || r.status() == AccountStatus.CHARGED_OFF
+				|| a.repaymentMethod().settlesOnPayment()
 				|| (r.maturityDate() != null && today.isAfter(r.maturityDate()));
 		boolean full = principal == null || principal >= r.principalBalance().won() || dueAll;
 		Money p = full ? r.principalBalance() : Money.won(principal);
