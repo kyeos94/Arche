@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { LegalAction, LoanDetail } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatMoney, legalLabel } from '@/lib/format'
 import { legalActionSchema, legalCostSchema, legalStageSchema } from '@/lib/schemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 const TERMINAL = ['CLOSED', 'WITHDRAWN', 'DISMISSED', 'RELEASED']
@@ -72,6 +74,7 @@ function LegalActionCard({ action: a, loan }: { action: LegalAction; loan: LoanD
     incurredOn: (c) => c.incurredOn,
     chargedOn: (c) => c.chargedOn,
   })
+  const costPaging = usePaging(costs)
   return (
     <Card>
       <CardHeader>
@@ -119,32 +122,34 @@ function LegalActionCard({ action: a, loan }: { action: LegalAction; loan: LoanD
               ))}
             </TBody>
           </Table>
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('costType')}>비용</SortTH>
-                <SortTH {...header('amount')} className="text-right">
-                  금액
-                </SortTH>
-                <SortTH {...header('incurredOn')}>발생일</SortTH>
-                <SortTH {...header('chargedOn')}>적재일</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {a.costs.length === 0 && <EmptyRow colSpan={4} />}
-              {costs.map((c) => (
-                <TR key={c.id}>
-                  <TD>
-                    {legalLabel(c.costType)}
-                    {c.memo && <span className="ml-1 text-muted-foreground">{c.memo}</span>}
-                  </TD>
-                  <TD className="num">{formatMoney(c.amount)}</TD>
-                  <TD>{formatDate(c.incurredOn)}</TD>
-                  <TD>{formatDate(c.chargedOn)}</TD>
+          <PagedList paging={costPaging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('costType')}>비용</SortTH>
+                  <SortTH {...header('amount')} className="text-right">
+                    금액
+                  </SortTH>
+                  <SortTH {...header('incurredOn')}>발생일</SortTH>
+                  <SortTH {...header('chargedOn')}>적재일</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {a.costs.length === 0 && <EmptyRow colSpan={4} />}
+                {costPaging.rows.map((c) => (
+                  <TR key={c.id}>
+                    <TD>
+                      {legalLabel(c.costType)}
+                      {c.memo && <span className="ml-1 text-muted-foreground">{c.memo}</span>}
+                    </TD>
+                    <TD className="num">{formatMoney(c.amount)}</TD>
+                    <TD>{formatDate(c.incurredOn)}</TD>
+                    <TD>{formatDate(c.chargedOn)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </div>
         <Can permission="collection.legal">
           <div className="flex gap-1">

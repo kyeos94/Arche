@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { type InboxItem, type NoteRef, type SentItem, noteKeys, notes, refPath } from '@/api/notes'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDateTime } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { cn } from '@/lib/utils'
 import { type ComposeInitial, NoteComposeDialog } from './NoteComposeDialog'
 
@@ -120,41 +122,47 @@ function NoteList<T extends { id: number }>({
   empty: string
   render: (item: T) => Row
 }) {
-  if (items?.length === 0) return <p className="py-6 text-center text-xs text-muted-foreground">{empty}</p>
+  const paging = usePaging(items)
   return (
-    <ul className="divide-y text-xs" aria-label="쪽지 목록">
-      {items?.map((item) => {
-        const r = render(item)
-        return (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className={cn(
-                'w-full px-2 py-1.5 text-left hover:bg-muted',
-                selected === item.id && 'bg-muted',
-                r.unread && 'font-semibold',
-              )}
-            >
-              <span className="flex justify-between gap-2">
-                <span className="truncate">
-                  {r.unread && <span className="mr-1 inline-block size-1.5 rounded-full bg-primary align-middle" />}
-                  {r.subject}
-                </span>
-                <span className="shrink-0 font-normal text-muted-foreground">{formatDateTime(r.at)}</span>
-              </span>
-              <span className="flex justify-between gap-2 font-normal text-muted-foreground">
-                <span className="truncate">{r.who}</span>
-                <span className="shrink-0">
-                  {r.ref && `${r.ref.label} `}
-                  {r.extra}
-                </span>
-              </span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+    <PagedList paging={paging.props}>
+      {items?.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="divide-y text-xs" aria-label="쪽지 목록">
+          {paging.rows.map((item) => {
+            const r = render(item)
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className={cn(
+                    'w-full px-2 py-1.5 text-left hover:bg-muted',
+                    selected === item.id && 'bg-muted',
+                    r.unread && 'font-semibold',
+                  )}
+                >
+                  <span className="flex justify-between gap-2">
+                    <span className="truncate">
+                      {r.unread && <span className="mr-1 inline-block size-1.5 rounded-full bg-primary align-middle" />}
+                      {r.subject}
+                    </span>
+                    <span className="shrink-0 font-normal text-muted-foreground">{formatDateTime(r.at)}</span>
+                  </span>
+                  <span className="flex justify-between gap-2 font-normal text-muted-foreground">
+                    <span className="truncate">{r.who}</span>
+                    <span className="shrink-0">
+                      {r.ref && `${r.ref.label} `}
+                      {r.extra}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </PagedList>
   )
 }
 

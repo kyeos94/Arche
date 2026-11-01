@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { type MessageTemplate, sliceApi, sliceKeys, sliceLabel } from './api'
 import { PLACEHOLDERS, templateSchema } from './schemas'
@@ -41,6 +43,7 @@ export function TemplatesPage() {
     purpose: (t) => sliceLabel(t.purpose),
     status: (t) => (t.active ? '사용' : '중지'),
   })
+  const paging = usePaging(sorted)
 
   function edit(t: MessageTemplate) {
     setEditing(t)
@@ -126,44 +129,46 @@ export function TemplatesPage() {
         </CardHeader>
         <CardContent>
           <ErrorMessage error={q.error} />
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('code')}>코드</SortTH>
-                <SortTH {...header('name')}>이름</SortTH>
-                <SortTH {...header('channel')}>수단</SortTH>
-                <SortTH {...header('purpose')}>목적</SortTH>
-                <TH>내용</TH>
-                <SortTH {...header('status')}>상태</SortTH>
-                <TH />
-              </TR>
-            </THead>
-            <TBody>
-              {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-              {sorted.map((t) => (
-                <TR key={t.id}>
-                  <TD className="font-mono">{t.code}</TD>
-                  <TD>{t.name}</TD>
-                  <TD>{sliceLabel(t.channel)}</TD>
-                  <TD>{sliceLabel(t.purpose)}</TD>
-                  <TD className="max-w-md truncate" title={t.body}>
-                    {t.title ? `[${t.title}] ` : ''}
-                    {t.body}
-                  </TD>
-                  <TD>
-                    <Badge className={t.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted'}>
-                      {t.active ? '사용' : '중지'}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <Button size="sm" variant="outline" onClick={() => edit(t)}>
-                      수정
-                    </Button>
-                  </TD>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('code')}>코드</SortTH>
+                  <SortTH {...header('name')}>이름</SortTH>
+                  <SortTH {...header('channel')}>수단</SortTH>
+                  <SortTH {...header('purpose')}>목적</SortTH>
+                  <TH>내용</TH>
+                  <SortTH {...header('status')}>상태</SortTH>
+                  <TH />
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {q.data?.length === 0 && <EmptyRow colSpan={7} />}
+                {paging.rows.map((t) => (
+                  <TR key={t.id}>
+                    <TD className="font-mono">{t.code}</TD>
+                    <TD>{t.name}</TD>
+                    <TD>{sliceLabel(t.channel)}</TD>
+                    <TD>{sliceLabel(t.purpose)}</TD>
+                    <TD className="max-w-md truncate" title={t.body}>
+                      {t.title ? `[${t.title}] ` : ''}
+                      {t.body}
+                    </TD>
+                    <TD>
+                      <Badge className={t.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted'}>
+                        {t.active ? '사용' : '중지'}
+                      </Badge>
+                    </TD>
+                    <TD>
+                      <Button size="sm" variant="outline" onClick={() => edit(t)}>
+                        수정
+                      </Button>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
     </div>

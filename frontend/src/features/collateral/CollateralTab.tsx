@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import type { LoanDetail } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import { Can } from '@/features/auth/auth'
 import { type Collateral, sliceApi, sliceKeys, sliceLabel, sliceTones } from '@/features/communication/api'
 import { collateralSchema, guarantorSchema } from '@/features/communication/schemas'
 import { formatDate, formatMoney } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
@@ -50,6 +52,7 @@ function CollateralCard({ loan }: { loan: LoanDetail }) {
     recognizedValue: (c) => c.recognizedValue,
     status: (c) => sliceLabel(c.status),
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -78,43 +81,45 @@ function CollateralCard({ loan }: { loan: LoanDetail }) {
           </dl>
         )}
         {s && s.staleCount > 0 && <Alert tone="warn">시세 조회 후 90일이 지난 담보가 {s.staleCount}건 있습니다. 재조회하세요.</Alert>}
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('type')}>유형</SortTH>
-              <SortTH {...header('description')}>설명</SortTH>
-              <SortTH {...header('identifier')}>식별</SortTH>
-              <SortTH {...header('seniorClaim')} className="text-right">
-                선순위
-              </SortTH>
-              <SortTH {...header('lienAmount')} className="text-right">
-                근저당 설정액
-              </SortTH>
-              <SortTH {...header('price')} className="text-right">
-                최근 시세
-              </SortTH>
-              <SortTH {...header('valuedOn')}>조회일</SortTH>
-              <SortTH {...header('recognizedValue')} className="text-right">
-                인정가액
-              </SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {q.data?.collaterals.length === 0 && <EmptyRow colSpan={10}>등록된 담보가 없습니다</EmptyRow>}
-            {sorted.map((c) => (
-              <CollateralRow
-                key={c.id}
-                c={c}
-                paidOff={loan.status === 'PAID_OFF'}
-                onValuate={() => valuate.mutate(c.id)}
-                onRelease={() => release.mutate(c.id)}
-                busy={valuate.isPending || release.isPending}
-              />
-            ))}
-          </TBody>
-        </Table>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('type')}>유형</SortTH>
+                <SortTH {...header('description')}>설명</SortTH>
+                <SortTH {...header('identifier')}>식별</SortTH>
+                <SortTH {...header('seniorClaim')} className="text-right">
+                  선순위
+                </SortTH>
+                <SortTH {...header('lienAmount')} className="text-right">
+                  근저당 설정액
+                </SortTH>
+                <SortTH {...header('price')} className="text-right">
+                  최근 시세
+                </SortTH>
+                <SortTH {...header('valuedOn')}>조회일</SortTH>
+                <SortTH {...header('recognizedValue')} className="text-right">
+                  인정가액
+                </SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <TH />
+              </TR>
+            </THead>
+            <TBody>
+              {q.data?.collaterals.length === 0 && <EmptyRow colSpan={10}>등록된 담보가 없습니다</EmptyRow>}
+              {paging.rows.map((c) => (
+                <CollateralRow
+                  key={c.id}
+                  c={c}
+                  paidOff={loan.status === 'PAID_OFF'}
+                  onValuate={() => valuate.mutate(c.id)}
+                  onRelease={() => release.mutate(c.id)}
+                  busy={valuate.isPending || release.isPending}
+                />
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
         <ErrorMessage error={valuate.error ?? release.error} />
         {loan.status !== 'PAID_OFF' && (
           <Can permission="loan.term.change">
@@ -286,6 +291,7 @@ function GuarantorCard({ loan }: { loan: LoanDetail }) {
     period: (g) => g.startDate,
     status: (g) => sliceLabel(g.status),
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -293,47 +299,54 @@ function GuarantorCard({ loan }: { loan: LoanDetail }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <ErrorMessage error={q.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('name')}>이름</SortTH>
-              <TH>주민등록번호</TH>
-              <TH>연락처</TH>
-              <SortTH {...header('relation')}>관계</SortTH>
-              <SortTH {...header('guaranteeLimit')} className="text-right">
-                보증 한도
-              </SortTH>
-              <SortTH {...header('period')}>보증 기간</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {q.data?.length === 0 && <EmptyRow colSpan={8}>등록된 보증인이 없습니다</EmptyRow>}
-            {sorted.map((g) => (
-              <TR key={g.id} className={cn(g.status !== 'ACTIVE' && 'text-muted-foreground')}>
-                <TD>{g.name}</TD>
-                <TD className="font-mono">{g.residentNoMasked}</TD>
-                <TD>{g.phoneMasked ?? '-'}</TD>
-                <TD>{g.relation}</TD>
-                <TD className="num">{formatMoney(g.guaranteeLimit)}</TD>
-                <TD>
-                  {formatDate(g.startDate)} ~ {g.endDate ? formatDate(g.endDate) : ''}
-                </TD>
-                <TD>{sliceLabel(g.status)}</TD>
-                <TD>
-                  {g.status === 'ACTIVE' && (
-                    <Can permission="loan.term.change">
-                      <Button size="sm" variant="outline" disabled={release.isPending} onClick={() => release.mutate(g.id)}>
-                        보증 해지
-                      </Button>
-                    </Can>
-                  )}
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('name')}>이름</SortTH>
+                <TH>주민등록번호</TH>
+                <TH>연락처</TH>
+                <SortTH {...header('relation')}>관계</SortTH>
+                <SortTH {...header('guaranteeLimit')} className="text-right">
+                  보증 한도
+                </SortTH>
+                <SortTH {...header('period')}>보증 기간</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <TH />
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {q.data?.length === 0 && <EmptyRow colSpan={8}>등록된 보증인이 없습니다</EmptyRow>}
+              {paging.rows.map((g) => (
+                <TR key={g.id} className={cn(g.status !== 'ACTIVE' && 'text-muted-foreground')}>
+                  <TD>{g.name}</TD>
+                  <TD className="font-mono">{g.residentNoMasked}</TD>
+                  <TD>{g.phoneMasked ?? '-'}</TD>
+                  <TD>{g.relation}</TD>
+                  <TD className="num">{formatMoney(g.guaranteeLimit)}</TD>
+                  <TD>
+                    {formatDate(g.startDate)} ~ {g.endDate ? formatDate(g.endDate) : ''}
+                  </TD>
+                  <TD>{sliceLabel(g.status)}</TD>
+                  <TD>
+                    {g.status === 'ACTIVE' && (
+                      <Can permission="loan.term.change">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={release.isPending}
+                          onClick={() => release.mutate(g.id)}
+                        >
+                          보증 해지
+                        </Button>
+                      </Can>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
         <ErrorMessage error={release.error} />
         {loan.status !== 'PAID_OFF' && (
           <Can permission="loan.term.change">
