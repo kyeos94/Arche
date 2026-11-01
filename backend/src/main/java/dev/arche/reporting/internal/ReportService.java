@@ -153,7 +153,8 @@ class ReportService implements DailyReports {
 			totals = store.journalTotals(d);
 			debit = snapshot.get().journalDebit();
 			credit = snapshot.get().journalCredit();
-			matches = totals.equals(live.totals());
+			// DB 정렬(collation)과 Java 정렬이 다를 수 있어 집합으로 비교
+			matches = new java.util.HashSet<>(totals).equals(new java.util.HashSet<>(live.totals()));
 		}
 		return new JournalView(d, snapshot.isPresent(), live.lines(), totals, debit, credit, debit == credit,
 				live.unmapped(), matches, store.accounts());
