@@ -99,6 +99,13 @@ export const statusLabels: Record<string, string> = {
   DELINQUENCY_30: '연체 안내 (30일째)',
   PAYOFF: '완제 안내',
   PROMISE_REMINDER: '약속 납부 안내',
+  REPURCHASED: '환매',
+  RELEASED: '해제',
+  CONSUMED: '사용됨',
+  INTEREST_SUSPENSION: '이자 부과 중단',
+  BUYER_TRANSFER: '양수인 이전',
+  SETOFF_IN: '상계 (받음)',
+  SETOFF_OUT: '상계 (보냄)',
 }
 
 export function statusLabel(code: string | null | undefined): string {

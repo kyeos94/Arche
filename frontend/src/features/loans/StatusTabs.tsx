@@ -1,7 +1,7 @@
 import { statusLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-export const LOAN_STATUSES = ['NORMAL', 'DELINQUENT', 'ACCELERATED', 'PAID_OFF'] as const
+export const LOAN_STATUSES = ['NORMAL', 'DELINQUENT', 'ACCELERATED', 'CHARGED_OFF', 'SOLD', 'PAID_OFF'] as const
 
 /** 상태 탭 + 건수. value가 ''이면 전체 */
 export function StatusTabs({

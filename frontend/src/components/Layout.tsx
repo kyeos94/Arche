@@ -15,6 +15,8 @@ const nav: { to: string; label: string; permission?: string }[] = [
   { to: '/alerts', label: '추심 알림', permission: 'loan.read' },
   { to: '/unmatched', label: '미확인 입금', permission: 'payment.register' },
   { to: '/corrections', label: '정정 승인', permission: 'payment.cancel.closed.approve' },
+  { to: '/charge-off', label: '상각 후보', permission: 'loan.chargeoff.confirm' },
+  { to: '/adjustments', label: '조정 결재', permission: 'loan.adjust.request' },
   { to: '/bulk', label: '입금 일괄 등록', permission: 'payment.register' },
   { to: '/admin', label: '운영 관리', permission: 'admin.manage' },
   { to: '/account', label: '내 계정' },

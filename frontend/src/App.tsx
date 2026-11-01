@@ -9,6 +9,7 @@ import { BulkPage } from '@/features/bulk/BulkPage'
 import { LoanDetailPage } from '@/features/loans/LoanDetailPage'
 import { LoanListPage } from '@/features/loans/LoanListPage'
 import { NewLoanPage } from '@/features/loans/NewLoanPage'
+import { AdjustmentsPage, ChargeOffCandidatesPage } from '@/features/lifecycle/pages'
 import { CorrectionsPage } from '@/features/payments/CorrectionsPage'
 import { UnmatchedPage } from '@/features/payments/UnmatchedPage'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +30,8 @@ export function App() {
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="unmatched" element={<UnmatchedPage />} />
         <Route path="corrections" element={<CorrectionsPage />} />
+        <Route path="charge-off" element={<ChargeOffCandidatesPage />} />
+        <Route path="adjustments" element={<AdjustmentsPage />} />
         <Route path="bulk" element={<BulkPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route
