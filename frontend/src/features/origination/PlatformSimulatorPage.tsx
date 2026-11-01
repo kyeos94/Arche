@@ -8,9 +8,10 @@ import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime, formatMoney, formatRate } from '@/lib/format'
 import { DUE_DAYS, money, residentNo } from '@/lib/schemas'
+import { useSort } from '@/lib/useSort'
 
 const schema = z.object({
   platformRef: z.string().trim().min(1, '플랫폼 신청 번호를 입력하세요').max(60),
@@ -77,6 +78,14 @@ export function PlatformSimulatorPage() {
         graceMonths: 0,
         dueDay: v.dueDay,
       }),
+  })
+  const { sorted, header } = useSort(notices.data, {
+    received: (n) => n.receivedAt,
+    platformRef: (n) => n.notice.platformRef,
+    applicationNo: (n) => n.notice.applicationNo,
+    result: (n) => n.notice.result,
+    approved: (n) => n.notice.approvedAmount,
+    delivered: (n) => n.delivered,
   })
   const e = form.formState.errors
   return (
@@ -186,17 +195,19 @@ export function PlatformSimulatorPage() {
           <Table>
             <THead>
               <TR>
-                <TH>수신</TH>
-                <TH>플랫폼 번호</TH>
-                <TH>신청번호</TH>
-                <TH>결과</TH>
-                <TH className="text-right">승인액</TH>
-                <TH>전달</TH>
+                <SortTH {...header('received')}>수신</SortTH>
+                <SortTH {...header('platformRef')}>플랫폼 번호</SortTH>
+                <SortTH {...header('applicationNo')}>신청번호</SortTH>
+                <SortTH {...header('result')}>결과</SortTH>
+                <SortTH {...header('approved')} className="text-right">
+                  승인액
+                </SortTH>
+                <SortTH {...header('delivered')}>전달</SortTH>
               </TR>
             </THead>
             <TBody>
               {notices.data?.length === 0 && <EmptyRow colSpan={6} />}
-              {notices.data?.map((n, i) => (
+              {sorted.map((n, i) => (
                 <TR key={i}>
                   <TD>{formatDateTime(n.receivedAt)}</TD>
                   <TD>{n.notice.platformRef}</TD>

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { Can, useAuth } from '@/features/auth/auth'
 import {
   type Withdrawal,
@@ -20,6 +20,7 @@ import {
 } from '@/features/communication/api'
 import { withdrawalSchema } from '@/features/communication/schemas'
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 const OPEN_STATUSES = 'REQUESTED,FIRST_APPROVED,SENDING,UNKNOWN'
 
@@ -30,6 +31,14 @@ const OPEN_STATUSES = 'REQUESTED,FIRST_APPROVED,SENDING,UNKNOWN'
 export function WithdrawalsPage() {
   const [filter, setFilter] = useState(OPEN_STATUSES)
   const q = useQuery({ queryKey: sliceKeys.withdrawals(filter), queryFn: () => sliceApi.withdrawals(filter) })
+  const { sorted, header } = useSort(q.data, {
+    no: (w) => w.withdrawalNo,
+    type: (w) => sliceLabel(w.type),
+    amount: (w) => w.amount,
+    reason: (w) => w.reason,
+    requested: (w) => w.requestedOn,
+    status: (w) => sliceLabel(w.status),
+  })
   return (
     <div className="space-y-3">
       <Can permission="withdrawal.create">
@@ -61,21 +70,23 @@ export function WithdrawalsPage() {
           <Table>
             <THead>
               <TR>
-                <TH>번호</TH>
-                <TH>유형</TH>
-                <TH className="text-right">금액</TH>
+                <SortTH {...header('no')}>번호</SortTH>
+                <SortTH {...header('type')}>유형</SortTH>
+                <SortTH {...header('amount')} className="text-right">
+                  금액
+                </SortTH>
                 <TH>받는 계좌</TH>
-                <TH>사유</TH>
-                <TH>작성</TH>
+                <SortTH {...header('reason')}>사유</SortTH>
+                <SortTH {...header('requested')}>작성</SortTH>
                 <TH>승인</TH>
-                <TH>상태</TH>
+                <SortTH {...header('status')}>상태</SortTH>
                 <TH>결과</TH>
                 <TH />
               </TR>
             </THead>
             <TBody>
               {q.data?.length === 0 && <EmptyRow colSpan={10} />}
-              {q.data?.map((w) => (
+              {sorted.map((w) => (
                 <WithdrawalRow key={w.id} w={w} />
               ))}
             </TBody>
