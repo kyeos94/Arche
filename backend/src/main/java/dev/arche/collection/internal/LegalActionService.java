@@ -139,9 +139,14 @@ class LegalActionService implements LegalActionLink {
 		LocalDate today = businessDates.today();
 		accounts.chargeCost(a.accountId(), amount,
 				a.actionNo() + " " + LegalActionRules.label(a.type()) + " " + type + (memo == null ? "" : " " + memo));
-		CurrentStaff me = staff.current();
-		return costs.save(new LegalActionCost(a.getId(), type, amount, incurredOn, today, trim(memo), me.id(),
-				OffsetDateTime.now(clock), me.loginId()));
+		CurrentStaff me = staff.currentIfAny().orElse(null);
+		return costs.save(new LegalActionCost(a.getId(), type, amount, incurredOn, today, trim(memo),
+				me == null ? null : me.id(), OffsetDateTime.now(clock), actor(me)));
+	}
+
+	/** 데모 데이터 등 로그인 없는 시스템 처리는 "system" */
+	private static String actor(@Nullable CurrentStaff me) {
+		return me == null ? "system" : me.loginId();
 	}
 
 	@Transactional(readOnly = true)
@@ -167,9 +172,9 @@ class LegalActionService implements LegalActionLink {
 	}
 
 	private void saveStage(LegalAction a, Stage stage, LocalDate on, @Nullable String memo, @Nullable Long eventId) {
-		CurrentStaff me = staff.current();
-		stages.save(new LegalActionStage(a.getId(), stage, on, trim(memo), eventId, me.id(), OffsetDateTime.now(clock),
-				me.loginId()));
+		CurrentStaff me = staff.currentIfAny().orElse(null);
+		stages.save(new LegalActionStage(a.getId(), stage, on, trim(memo), eventId, me == null ? null : me.id(),
+				OffsetDateTime.now(clock), actor(me)));
 	}
 
 	private void requireNotFuture(LocalDate date) {
