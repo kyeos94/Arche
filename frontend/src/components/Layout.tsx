@@ -17,6 +17,11 @@ const nav: { to: string; label: string; permission?: string }[] = [
   { to: '/corrections', label: '정정 승인', permission: 'payment.cancel.closed.approve' },
   { to: '/bulk', label: '입금 일괄 등록', permission: 'payment.register' },
   { to: '/admin', label: '운영 관리', permission: 'admin.manage' },
+  { to: '/applications', label: '신청 목록', permission: 'application.review' },
+  { to: '/underwriters', label: '심사자 배정', permission: 'application.review' },
+  { to: '/brokers', label: '중개업자', permission: 'application.review' },
+  { to: '/products', label: '상품', permission: 'application.review' },
+  { to: '/mock-platform', label: 'Mock 플랫폼', permission: 'application.review' },
   { to: '/account', label: '내 계정' },
 ]
 
