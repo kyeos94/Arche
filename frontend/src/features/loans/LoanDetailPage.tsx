@@ -6,13 +6,14 @@ import type { LoanDetail } from '@/api/types'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Can } from '@/features/auth/auth'
+import { Can, useAuth } from '@/features/auth/auth'
 import { LegalTab } from '@/features/collection/LegalTab'
 import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
 import { CollateralTab } from '@/features/collateral/CollateralTab'
 import { TimelinePanel } from '@/features/communication/TimelinePanel'
 import { LifecycleTab } from '@/features/lifecycle/LifecycleTab'
+import { PrintTab } from '@/features/documents/PrintTab'
 import { CollectionTab } from './CollectionTab'
 import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
@@ -79,6 +80,7 @@ function Terms({ loan }: { loan: LoanDetail }) {
 export function LoanDetailPage() {
   const id = Number(useParams().id)
   const [tab, setTab] = useState('schedule')
+  const { can } = useAuth()
   const q = useQuery({ queryKey: queryKeys.loan(id), queryFn: () => endpoints.loan(id) })
 
   if (q.error) return <ErrorMessage error={q.error} />
@@ -127,6 +129,7 @@ export function LoanDetailPage() {
               <TabsTrigger value="legal">법조치</TabsTrigger>
               <TabsTrigger value="collateral">담보·보증인</TabsTrigger>
               <TabsTrigger value="lifecycle">생애주기</TabsTrigger>
+              {can('document.print') && <TabsTrigger value="print">양식인쇄</TabsTrigger>}
             </TabsList>
             {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
             <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
@@ -137,6 +140,7 @@ export function LoanDetailPage() {
             <TabsContent value="legal">{tab === 'legal' && <LegalTab loan={loan} />}</TabsContent>
             <TabsContent value="collateral">{tab === 'collateral' && <CollateralTab loan={loan} />}</TabsContent>
             <TabsContent value="lifecycle">{tab === 'lifecycle' && <LifecycleTab loan={loan} />}</TabsContent>
+            <TabsContent value="print">{tab === 'print' && <PrintTab loan={loan} />}</TabsContent>
           </Tabs>
         </div>
         <TimelinePanel loanId={id} />

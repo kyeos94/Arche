@@ -11,6 +11,8 @@ import { formatDate, formatMoney, formatNumber, statusLabel } from '@/lib/format
 import { useAuth } from '@/features/auth/auth'
 import { ExcelDownloadDialog } from '@/features/reports/ExcelDownloadDialog'
 import { StatusTabs } from './StatusTabs'
+import type { LoanListItem } from '@/api/types'
+import { BulkActionBar } from './bulk/BulkActionBar'
 
 /** 계약 목록: 검색 조건은 URL 쿼리스트링과 동기화 (뒤로 가기·새로고침·링크 공유) */
 export function LoanListPage() {
@@ -21,6 +23,21 @@ export function LoanListPage() {
   const q = params.get('q') ?? ''
   const page = Number(params.get('page') ?? 0)
   const [draft, setDraft] = useState(q)
+  // 일괄 작업용 선택 (ADR 0010): 페이지를 넘겨도 유지하고, 상태·검색어가 바뀌면 비운다
+  const filterKey = `${status}|${q}`
+  const [selection, setSelection] = useState<{ key: string; items: Map<number, LoanListItem> }>({
+    key: filterKey,
+    items: new Map(),
+  })
+  const selectedMap = selection.key === filterKey ? selection.items : new Map<number, LoanListItem>()
+  const selected = [...selectedMap.values()]
+  const setSelected = (next: Map<number, LoanListItem>) => setSelection({ key: filterKey, items: next })
+  const toggle = (row: LoanListItem, on: boolean) => {
+    const next = new Map(selectedMap)
+    if (on) next.set(row.id, row)
+    else next.delete(row.id)
+    setSelected(next)
+  }
 
   const search = { status, q, page, size: 50 }
   const counts = useQuery({ queryKey: queryKeys.statusCounts, queryFn: endpoints.statusCounts })
@@ -40,6 +57,14 @@ export function LoanListPage() {
   }
 
   const data = list.data
+  const pageRows = data?.content ?? []
+  const pageAllSelected = pageRows.length > 0 && pageRows.every((r) => selectedMap.has(r.id))
+  const pageSomeSelected = pageRows.some((r) => selectedMap.has(r.id))
+  const togglePage = (on: boolean) => {
+    const next = new Map(selectedMap)
+    pageRows.forEach((r) => (on ? next.set(r.id, r) : next.delete(r.id)))
+    setSelected(next)
+  }
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -73,9 +98,22 @@ export function LoanListPage() {
       </div>
       <StatusTabs counts={counts.data} value={status} onChange={(s) => update({ status: s, page: '' })} />
       <ErrorMessage error={list.error} />
+      <BulkActionBar selected={selected} onClear={() => setSelected(new Map())} />
       <Table>
         <THead>
           <TR>
+            <TH className="w-8">
+              <input
+                type="checkbox"
+                aria-label="이 페이지 모두 선택"
+                checked={pageAllSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = !pageAllSelected && pageSomeSelected
+                }}
+                onChange={(e) => togglePage(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+            </TH>
             <TH>계약번호</TH>
             <TH>고객명</TH>
             <TH>상품</TH>
@@ -87,9 +125,19 @@ export function LoanListPage() {
           </TR>
         </THead>
         <TBody>
-          {data?.content.length === 0 && <EmptyRow colSpan={8} />}
+          {data?.content.length === 0 && <EmptyRow colSpan={9} />}
           {data?.content.map((r) => (
             <TR key={r.id} className="cursor-pointer" onClick={() => navigate(`/loans/${r.id}`)}>
+              {/* 체크박스 칸을 눌러도 상세로 가지 않게 */}
+              <TD onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  aria-label={`${r.accountNo} 선택`}
+                  checked={selectedMap.has(r.id)}
+                  onChange={(e) => toggle(r, e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+              </TD>
               <TD className="font-medium text-primary">{r.accountNo}</TD>
               <TD>{r.customerName}</TD>
               <TD>{r.productCode}</TD>

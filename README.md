@@ -141,4 +141,6 @@ cd frontend && npm test
 | 대량 다운로드 관리자 알림 (guide 8.2) | reporting 엑셀 + 접근 기록 |
 | 상각 후보 월말 배치 (지금은 후보 목록 화면) | operation 일마감 |
 | 매입채권 채무조정·조정 완제, 매입채권 연체 문자(R38로 현재는 보내지 않음, 기준일 정의 필요) | collection |
+| 계약 목록 일괄 문자 발송, 담당자·속성 일괄 변경 | `frontend/src/features/loans/bulk/bulkActions.ts`에 작업 등록 + 작업별 서버 API ([ADR 0010](docs/adr/0010-print-documents-and-bulk-actions.md)) |
+| 양식 관리 화면(양식 추가·수정, 치환 문자열 검증은 이미 있음), PDF 저장 | document 모듈 `print_template` + `DocumentPlaceholders.validate` |
 | 대량 일마감 성능 | 마지막 마감 스냅샷부터 재생 |
