@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime } from '@/lib/format'
-import { buildPrintDocument, printHtml } from '@/lib/print'
+import { buildPrintDocument, fitPages, printHtml } from '@/lib/print'
 
 /** 계약 상세 "양식인쇄" 탭 (R72): 양식을 골라 미리보고 1건 인쇄 */
 export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> }) {
@@ -77,6 +77,7 @@ export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> 
             <iframe
               title={`${template?.name ?? '양식'} 미리보기`}
               srcDoc={buildPrintDocument(preview.data)}
+              onLoad={(e) => fitPages(e.currentTarget.contentDocument)}
               className="h-[640px] w-full rounded border bg-white"
             />
           )}

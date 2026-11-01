@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LoanListItem } from '@/api/types'
-import { buildPrintDocument } from '@/lib/print'
+import { buildPrintDocument, fitPages } from '@/lib/print'
 import { PrintBulkDialog } from './PrintBulkDialog'
 
 vi.mock('@/lib/print', async (orig) => ({ ...(await orig<typeof import('@/lib/print')>()), printHtml: vi.fn() }))
@@ -90,5 +90,30 @@ describe('인쇄 문서', () => {
     expect(html).toContain('<title>&lt;독촉장&gt;</title>')
     expect(html).toContain('.doc{color:red}')
     expect(html).toContain('@page { size: A4')
+  })
+
+  it('A4 한 장을 넘는 쪽만 줄여 맞추고, 너무 작게는 줄이지 않는다', () => {
+    const doc = new DOMParser().parseFromString(
+      buildPrintDocument({
+        templateName: 't',
+        css: '',
+        documents: [1, 2, 3].map((i) => ({ accountId: i, accountNo: 'L', customerName: 'a', documentNo: '1', html: 'x' })),
+      }),
+      'text/html',
+    )
+    // jsdom은 레이아웃을 계산하지 않으므로 높이를 흉내 낸다: 내용 높이 / zoom
+    const contentHeights = [1000, 1300, 3000]
+    doc.querySelectorAll<HTMLElement>('section.page').forEach((page, i) => {
+      const fit = page.querySelector<HTMLElement>('.fit')!
+      Object.defineProperty(page, 'clientHeight', { value: 1100 })
+      Object.defineProperty(page, 'scrollHeight', {
+        get: () => Math.max(1100, contentHeights[i] * Number(fit.style.zoom || 1)),
+      })
+    })
+    const zooms = fitPages(doc)
+    expect(zooms[0]).toBe(1)
+    expect(zooms[1]).toBeLessThan(1100 / 1300 + 0.001)
+    expect(zooms[1]).toBeGreaterThan(0.8)
+    expect(zooms[2]).toBe(0.7)
   })
 })
