@@ -82,15 +82,17 @@ class ContactService {
 
 	private final ContactLogRepository logs;
 	private final DeferralService deferrals;
+	private final CollectionStopService stops;
 	private final LoanAccounts accounts;
 	private final BusinessDates businessDates;
 	private final StaffDirectory staff;
 	private final Clock clock;
 
-	ContactService(ContactLogRepository logs, DeferralService deferrals, LoanAccounts accounts,
-			BusinessDates businessDates, StaffDirectory staff, Clock clock) {
+	ContactService(ContactLogRepository logs, DeferralService deferrals, CollectionStopService stops,
+			LoanAccounts accounts, BusinessDates businessDates, StaffDirectory staff, Clock clock) {
 		this.logs = logs;
 		this.deferrals = deferrals;
+		this.stops = stops;
 		this.accounts = accounts;
 		this.businessDates = businessDates;
 		this.staff = staff;
@@ -120,7 +122,8 @@ class ContactService {
 	}
 
 	/**
-	 * 연락 판정 순서: 법정·계약상 통지는 항상 허용 → 소멸시효 완성 → 연락 유예 → 연락 가능 시간(문자는 예약) → 7일 7회.
+	 * 연락 판정 순서: 법정·계약상 통지는 항상 허용 → 매각 채권(R40)·추심 중지(R45) → 소멸시효 완성 → 연락 유예
+	 * → 연락 가능 시간(문자는 예약) → 7일 7회.
 	 */
 	@Transactional(readOnly = true)
 	Verdict decide(long accountId, ContactQuotaGuard.Channel channel, LocalDate today, LocalTime time) {
@@ -132,7 +135,11 @@ class ContactService {
 		String reason = null;
 		LimitationInfo limitation = accounts.limitation(accountId);
 		ContactDeferral deferral = deferrals.activeOn(accountId, today).orElse(null);
-		if (limitation.completed()) {
+		String stopped = stops.blockReason(accountId);
+		if (stopped != null) {
+			result = ContactLog.Result.BLOCKED;
+			reason = stopped;
+		} else if (limitation.completed()) {
 			result = ContactLog.Result.BLOCKED;
 			reason = "소멸시효가 완성된 채권(" + limitation.completionDate() + ")은 추심 연락을 할 수 없습니다";
 		} else if (deferral != null) {
