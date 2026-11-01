@@ -47,7 +47,7 @@ class PermissionMatrixTest {
 	void 정책서_9_1_권한표와_같다(Permission permission, String row) {
 		List<String> marks = Arrays.asList(row.trim().split("\\s+"));
 		for (int i = 0; i < COLUMNS.size(); i++) {
-			assertThat(permission.grantedTo(COLUMNS.get(i))).as(permission + " / " + COLUMNS.get(i))
+			assertThat(permission.grantedByDefault(COLUMNS.get(i))).as(permission + " / " + COLUMNS.get(i))
 					.isEqualTo(marks.get(i).equals("O"));
 		}
 	}

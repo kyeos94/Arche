@@ -8,12 +8,17 @@ import static dev.arche.staff.Role.TELLER;
 import static dev.arche.staff.Role.UNDERWRITER;
 import static dev.arche.staff.Role.UNDERWRITING_LEAD;
 
+import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * 권한 코드 = 정책서 9.1 역할별 권한표. 권한 문자열은 {@code @PreAuthorize("hasAuthority('loan.read')")}에 그대로 쓴다.
  * 승인이 필요한 작업은 작성자와 승인자가 달라야 한다 (서비스에서 검사).
+ * <p>
+ * enum에 적힌 역할은 정책서 기본값이다. 시스템관리자가 권한 관리 화면에서 바꾼 부분(R69)은 staff 모듈이
+ * {@link #applyOverrides}로 넣고, {@link #grantedTo}는 바뀐 값을 우선한다.
  */
 public enum Permission {
 
@@ -66,6 +71,9 @@ public enum Permission {
 	private final String code;
 	private final Set<Role> roles;
 
+	/** 정책서 기본값과 다르게 바꾼 권한 (R69). 키가 없으면 기본값 */
+	private static volatile Map<Permission, Map<Role, Boolean>> overrides = Map.of();
+
 	Permission(String code, Role first, Role... rest) {
 		this.code = code;
 		this.roles = EnumSet.of(first, rest);
@@ -75,8 +83,38 @@ public enum Permission {
 		return code;
 	}
 
+	/** 지금 적용 중인 권한 (권한 관리에서 바꾼 값 우선) */
 	public boolean grantedTo(Role role) {
+		if (role == Role.DEMO_ALL) {
+			return true;
+		}
+		Boolean changed = overrides.getOrDefault(this, Map.of()).get(role);
+		return changed != null ? changed : roles.contains(role);
+	}
+
+	/** 정책서 9.1 기본값 */
+	public boolean grantedByDefault(Role role) {
 		return role == Role.DEMO_ALL || roles.contains(role);
+	}
+
+	/** 권한 관리에서 바꾼 값 전체를 교체한다 (staff 모듈 전용). 빈 맵이면 정책서 기본값으로 돌아감 */
+	public static void applyOverrides(Map<Permission, Map<Role, Boolean>> changed) {
+		Map<Permission, Map<Role, Boolean>> copy = new EnumMap<>(Permission.class);
+		changed.forEach((p, byRole) -> {
+			if (!byRole.isEmpty()) {
+				copy.put(p, Map.copyOf(new EnumMap<>(byRole)));
+			}
+		});
+		overrides = Map.copyOf(copy);
+	}
+
+	public static Permission byCode(String code) {
+		for (Permission p : values()) {
+			if (p.code.equals(code)) {
+				return p;
+			}
+		}
+		throw new IllegalArgumentException("unknown permission " + code);
 	}
 
 	public static Set<Permission> of(Role role) {

@@ -35,6 +35,9 @@ class SecurityConfig {
 		http
 				.csrf(csrf -> csrf.spa().ignoringRequestMatchers("/api/integration/**"))
 				.securityContext(c -> c.securityContextRepository(securityContextRepository()))
+				// 권한 관리에서 바꾼 권한을 로그인 중인 세션에도 바로 반영 (R69)
+				.addFilterAfter(new AuthorityRefreshFilter(securityContextRepository()),
+						org.springframework.security.web.context.SecurityContextHolderFilter.class)
 				.sessionManagement(s -> s.maximumSessions(1).sessionRegistry(sessionRegistry)
 						.expiredSessionStrategy(event -> {
 							event.getResponse().setStatus(HttpServletResponse.SC_UNAUTHORIZED);
