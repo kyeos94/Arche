@@ -1,16 +1,18 @@
 import { useSyncExternalStore } from 'react'
 
-/** 화면 설정: 테마(라이트·다크·시스템)와 메뉴 위치(왼쪽·상단). 브라우저(localStorage)에만 저장 */
+/** 화면 설정: 테마(라이트·다크·시스템), 메뉴 위치(왼쪽·상단), 접어 둔 메뉴 대분류. 브라우저(localStorage)에만 저장 */
 export type Theme = 'light' | 'dark' | 'system'
 export type NavPosition = 'side' | 'top'
 
 export interface Preferences {
   theme: Theme
   nav: NavPosition
+  /** 왼쪽 메뉴에서 접어 둔 대분류 key */
+  collapsed: string[]
 }
 
 export const STORAGE_KEY = 'arche.preferences'
-const DEFAULTS: Preferences = { theme: 'system', nav: 'side' }
+const DEFAULTS: Preferences = { theme: 'system', nav: 'side', collapsed: [] }
 
 function read(): Preferences {
   try {
@@ -20,6 +22,7 @@ function read(): Preferences {
     return {
       theme: parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system' ? parsed.theme : 'system',
       nav: parsed.nav === 'top' ? 'top' : 'side',
+      collapsed: Array.isArray(parsed.collapsed) ? parsed.collapsed.filter((k) => typeof k === 'string') : [],
     }
   } catch {
     return DEFAULTS
@@ -77,3 +80,11 @@ export function initPreferences(): void {
 
 export const THEME_ORDER: Theme[] = ['light', 'dark', 'system']
 export const THEME_LABEL: Record<Theme, string> = { light: '라이트', dark: '다크', system: '시스템' }
+
+/** 왼쪽 메뉴 대분류 접기·펼치기 */
+export function toggleCollapsed(key: string): void {
+  const set = new Set(current.collapsed)
+  if (set.has(key)) set.delete(key)
+  else set.add(key)
+  setPreferences({ collapsed: [...set] })
+}

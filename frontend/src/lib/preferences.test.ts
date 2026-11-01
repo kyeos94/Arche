@@ -26,7 +26,7 @@ describe('preferences', () => {
   })
 
   it('기본값은 시스템 테마 + 왼쪽 메뉴', () => {
-    expect(getPreferences()).toEqual({ theme: 'system', nav: 'side' })
+    expect(getPreferences()).toEqual({ theme: 'system', nav: 'side', collapsed: [] })
     expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 
@@ -53,6 +53,6 @@ describe('preferences', () => {
   it('저장된 값이 깨져 있으면 기본값', () => {
     localStorage.setItem(STORAGE_KEY, '{not json')
     initPreferences()
-    expect(getPreferences()).toEqual({ theme: 'system', nav: 'side' })
+    expect(getPreferences()).toEqual({ theme: 'system', nav: 'side', collapsed: [] })
   })
 })
