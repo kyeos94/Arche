@@ -55,7 +55,24 @@ mvp.md 5장의 범위 밖 기능 중 "문자·팩스·우편, 연락 타임라�
   `GET /api/loans/{id}/templates/{tid}/preview`, `GET|POST /api/message-templates[/{tid}]`
 - 계약 상세 우측 패널 = 타임라인 + 빠른 입력(전화·방문 기록은 기존 `/contacts`, 문자·팩스·우편은 `/dispatches`, 메모), 남은 연락 횟수 표시
 - 권한: 발송·메모 `collection.activity`, 템플릿 관리 `admin.manage`(정책서 9.1 "코드 관리"), 조회 `loan.read`
+- 담보·보증인: `GET|POST /api/loans/{id}/collaterals`, `POST .../collaterals/{cid}/valuations|release`,
+  `GET|POST /api/loans/{id}/guarantors`, `POST .../guarantors/{gid}/release`. 등록·시세 조회·해지는 `loan.term.change`(R60 ④)
+- 출금: `GET /api/withdrawals?status=a,b`, `GET /api/withdrawals/candidates`, `POST /api/withdrawals`,
+  `POST /api/withdrawals/{id}/approve|reject|cancel|inquire`. 작성 `withdrawal.create`, 승인·반려 `withdrawal.approve.*`.
+  승인 단계는 권한 코드가 아니라 역할로 검사한다(`ApprovalPolicy`: 1단계 채권팀장, 2단계 본부장). `Permission` enum은 바꾸지 않았다
+- 신용정보 보고: `GET /api/credit-reports`, `GET /api/credit-reports/{id}`, `GET .../{id}/file`, `POST /api/credit-reports/run`,
+  `POST .../{id}/send|result`. 권한 `admin.manage`(배치 관리). 일 배치는 23:30 `@Scheduled` + ShedLock
+- 연계 이력: `GET /api/integration/logs?institution&page&size` (`admin.manage`)
+- 화면: 계약 상세 우측 타임라인 패널·담보·보증인 탭, 출금 작성·승인, 문자 템플릿, 신용정보 보고 (프런트는 `features/communication/api.ts`에
+  이 범위의 타입·호출을 모아 공용 `endpoints.ts`를 건드리지 않았다)
+
+### 트랜잭션
+- 송금·결과 조회처럼 지연이 있는 외부 호출은 DB 트랜잭션 밖에서 한다(`TransactionTemplate`으로 승인 커밋 → 호출 → 결과 기록).
+- 예약 문자·배달 조회·송금 결과 조회·신용정보 보고는 `@Scheduled` + `@SchedulerLock`(ShedLock)으로 한 서버에서만 돈다.
 
 ## 결과
+- 같은 시기의 다른 작업이 연계 이력 테이블을 따로 만들 수 있어 이름을 `integration_call_log`(엔티티 `IntegrationCallLog`)로 구분했다.
+  병합 후 하나로 합치는 것은 후속 정리 대상.
+- 계약 중 가수금 반환, 보증인 대위변제, 배달 결과로 기한이익상실 도달일 대체(R3)는 이번 범위에서 연결하지 않았다(R59 ⑤·R60 ⑤·R62 ①).
 - 실제 기관 연계 시 같은 포트의 다른 어댑터로 바꾸면 된다(`@ConditionalOnProperty`).
 - 타임라인은 출처별 조회 후 메모리에서 합쳐 페이지를 나눈다. 계약 1건의 연락 이력은 수백 건 수준이라 충분하며, 커지면 UNION 쿼리로 바꾼다.
