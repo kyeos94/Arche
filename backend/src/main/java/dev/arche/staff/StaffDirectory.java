@@ -1,6 +1,7 @@
 package dev.arche.staff;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -22,4 +23,10 @@ public interface StaffDirectory {
 
 	/** 로그인할 수 있는(사용 중·잠기지 않은) 해당 역할 직원. 심사자 배정 후보 등 (R55) */
 	List<CurrentStaff> activeByRole(Role role);
+
+	/** 로그인할 수 있는(사용 중·잠기지 않은) 모든 직원. 쪽지 받는 사람 고르기 등 */
+	List<CurrentStaff> active();
+
+	/** 팀 id → 팀 이름 */
+	Map<Long, String> teamNames();
 }

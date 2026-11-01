@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,6 +39,8 @@ interface StaffRepository extends JpaRepository<Staff, Long> {
 	List<Staff> findByTeamId(Long teamId);
 
 	List<Staff> findByRoleAndEnabledTrueAndLockedFalseOrderById(Role role);
+
+	List<Staff> findByEnabledTrueAndLockedFalseOrderById();
 }
 
 interface AccessLogRepository extends JpaRepository<AccessLogEntry, Long> {
@@ -72,9 +76,11 @@ record StaffPrincipal(CurrentStaff staff, boolean passwordChangeRequired) implem
 class DefaultStaffDirectory implements StaffDirectory {
 
 	private final StaffRepository staff;
+	private final JdbcClient jdbc;
 
-	DefaultStaffDirectory(StaffRepository staff) {
+	DefaultStaffDirectory(StaffRepository staff, JdbcClient jdbc) {
 		this.staff = staff;
+		this.jdbc = jdbc;
 	}
 
 	@Override
@@ -120,6 +126,21 @@ class DefaultStaffDirectory implements StaffDirectory {
 	@Transactional(readOnly = true)
 	public List<CurrentStaff> activeByRole(Role role) {
 		return staff.findByRoleAndEnabledTrueAndLockedFalseOrderById(role).stream().map(Staff::toCurrent).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<CurrentStaff> active() {
+		return staff.findByEnabledTrueAndLockedFalseOrderById().stream().map(Staff::toCurrent).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Map<Long, String> teamNames() {
+		Map<Long, String> names = new java.util.LinkedHashMap<>();
+		jdbc.sql("select id, name from team order by id").query((rs, n) -> names.put(rs.getLong(1), rs.getString(2)))
+				.list();
+		return names;
 	}
 }
 

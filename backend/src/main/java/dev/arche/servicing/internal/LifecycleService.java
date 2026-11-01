@@ -1,5 +1,9 @@
 package dev.arche.servicing.internal;
 
+import dev.arche.servicing.AdjustmentDecided;
+import dev.arche.servicing.AdjustmentRequested;
+import org.springframework.context.ApplicationEventPublisher;
+
 import dev.arche.calendar.BusinessDates;
 import dev.arche.common.BusinessException;
 import dev.arche.common.Money;
@@ -52,10 +56,11 @@ class LifecycleService {
 	private final BusinessDates businessDates;
 	private final StaffDirectory staff;
 	private final NumberGenerator numbers;
+	private final ApplicationEventPublisher publisher;
 
 	LifecycleService(LoanAccountRepository accounts, AccountEventRepository events, LoanSaleRepository sales,
 			AdjustmentRequestRepository requests, AccountReplayer replayer, BusinessDates businessDates,
-			StaffDirectory staff, NumberGenerator numbers) {
+			StaffDirectory staff, NumberGenerator numbers, ApplicationEventPublisher publisher) {
 		this.accounts = accounts;
 		this.events = events;
 		this.sales = sales;
@@ -64,6 +69,7 @@ class LifecycleService {
 		this.businessDates = businessDates;
 		this.staff = staff;
 		this.numbers = numbers;
+		this.publisher = publisher;
 	}
 
 	// ------------------------------------------------------------------ 상각 (R39)
@@ -212,7 +218,27 @@ class LifecycleService {
 		}
 		r.target(resolveTarget(c));
 		validate(r);
-		return requests.save(r);
+		AdjustmentRequest saved = requests.save(r);
+		publisher.publishEvent(new AdjustmentRequested(saved.getId(), saved.requestNo(), saved.accountId(),
+				find(saved.accountId()).accountNo(), typeLabel(saved.type()), me.id(), me.name()));
+		return saved;
+	}
+
+	/** 쪽지 등 사람이 읽는 곳에 쓰는 요청 종류 이름 */
+	static String typeLabel(AdjustmentRequest.Type type) {
+		return switch (type) {
+			case ADJUSTMENT -> "수기 조정";
+			case SETOFF -> "상계";
+			case REVERT_CHARGE_OFF -> "상각 취소";
+			case REVERT_SALE -> "매각 취소";
+			case REVERT_SETOFF -> "상계 취소";
+			case REVERT_PAYOFF -> "완제 취소";
+		};
+	}
+
+	private void decided(AdjustmentRequest r, boolean approved, CurrentStaff me) {
+		publisher.publishEvent(new AdjustmentDecided(r.getId(), r.requestNo(), r.accountId(),
+				find(r.accountId()).accountNo(), typeLabel(r.type()), r.requestedBy(), approved, me.name()));
 	}
 
 	/** 되돌릴 이벤트: 상각·매각은 현재 유효한 것, 상계는 요청에 지정한 대상 계약의 SETOFF_IN */
@@ -249,11 +275,13 @@ class LifecycleService {
 		LocalDate today = businessDates.today();
 		if (!approve) {
 			r.rejected(me.id(), today);
+			decided(r, false, me);
 			return r;
 		}
 		validate(r);
 		Long eventId = execute(r, today);
 		r.applied(me.id(), today, eventId);
+		decided(r, true, me);
 		return r;
 	}
 
