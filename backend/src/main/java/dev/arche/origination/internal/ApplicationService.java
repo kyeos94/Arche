@@ -40,6 +40,9 @@ interface LoanApplicationRepository extends JpaRepository<LoanApplication, Long>
 	Optional<LoanApplication> findByIntakeSourceAndExternalRef(String intakeSource, String externalRef);
 
 	Optional<LoanApplication> findByApplicationNo(String applicationNo);
+
+	List<LoanApplication> findByUnderwriterIdAndStatusInOrderById(Long underwriterId,
+			java.util.Collection<ApplicationStatus> statuses);
 }
 
 interface ApplicationStatusHistoryRepository extends JpaRepository<ApplicationStatusHistory, Long> {
@@ -52,7 +55,11 @@ interface ApplicationStatusHistoryRepository extends JpaRepository<ApplicationSt
  * Spring Modulith가 같은 트랜잭션에서 발행 기록을 남겨 유실을 막는다 (Transactional Outbox).
  */
 @Service
-class ApplicationService {
+class ApplicationService implements dev.arche.origination.UnderwriterAssignments {
+
+	/** 심사자가 아직 책임지는 신청 상태 (R75) */
+	static final List<ApplicationStatus> OPEN_FOR_UNDERWRITER = List.of(ApplicationStatus.ASSIGNED,
+			ApplicationStatus.UNDERWRITING, ApplicationStatus.APPROVED, ApplicationStatus.CONTRACTED);
 
 	private static final Logger log = LoggerFactory.getLogger(ApplicationService.class);
 
@@ -252,6 +259,29 @@ class ApplicationService {
 		events.publishEvent(new LoanDisbursed(a.getId(), a.applicationNo(), a.customerId(), a.productCode(),
 				a.approvedAmount(), a.approvedRate(), a.termMonths(), a.graceMonths(), a.dueDay(), today));
 		return a;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public int openCount(long staffId) {
+		return applications.findByUnderwriterIdAndStatusInOrderById(staffId, OPEN_FOR_UNDERWRITER).size();
+	}
+
+	@Override
+	@Transactional
+	public int reassignOpen(long fromStaffId, long toStaffId, String reason) {
+		List<LoanApplication> open = applications.findByUnderwriterIdAndStatusInOrderById(fromStaffId,
+				OPEN_FOR_UNDERWRITER);
+		for (LoanApplication a : open) {
+			String to;
+			try {
+				to = assignment.assignManual(a, toStaffId).name();
+			} catch (BusinessException e) {
+				throw new BusinessException(e.code(), a.applicationNo() + ": " + e.getMessage());
+			}
+			record(a, a.status(), a.status(), "퇴사 이관 → " + to + ": " + reason);
+		}
+		return open.size();
 	}
 
 	List<ApplicationStatusHistory> history(long id) {

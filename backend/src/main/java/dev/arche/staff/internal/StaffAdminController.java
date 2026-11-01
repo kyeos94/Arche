@@ -28,7 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 class StaffAdminController {
 
 	record StaffRow(long id, String loginId, String name, String role, String roleLabel, Long teamId,
-			boolean locked, int failedAttempts) {
+			boolean locked, int failedAttempts, boolean enabled, OffsetDateTime resignedAt) {
+	}
+
+	record CreateRequest(String loginId, String name, String role, Long teamId) {
+	}
+
+	record ReasonRequest(String reason) {
 	}
 
 	record ResetRequest(String temporaryPassword) {
@@ -42,10 +48,12 @@ class StaffAdminController {
 	private final AccessLogRepository logs;
 	private final PasswordEncoder encoder;
 	private final DefaultAccessLogger accessLog;
+	private final StaffAccountService accounts;
 	private final Clock clock;
 
 	StaffAdminController(StaffRepository staff, AccessLogRepository logs, PasswordEncoder encoder,
-			DefaultAccessLogger accessLog, Clock clock) {
+			DefaultAccessLogger accessLog, StaffAccountService accounts, Clock clock) {
+		this.accounts = accounts;
 		this.staff = staff;
 		this.logs = logs;
 		this.encoder = encoder;
@@ -57,7 +65,24 @@ class StaffAdminController {
 	@Transactional(readOnly = true)
 	List<StaffRow> list() {
 		return staff.findAll().stream().map(s -> new StaffRow(s.getId(), s.loginId(), s.name(), s.role().name(),
-				s.role().label(), s.teamId(), s.locked(), s.failedAttempts())).toList();
+				s.role().label(), s.teamId(), s.locked(), s.failedAttempts(), s.enabled(), s.resignedAt())).toList();
+	}
+
+	/** 직원 등록 (R75). 임시 비밀번호는 이 응답에서 한 번만 보여 준다 */
+	@PostMapping("/staff")
+	StaffAccountService.Created create(@RequestBody CreateRequest r) {
+		return accounts.create(r.loginId(), r.name(), r.role(), r.teamId());
+	}
+
+	/** 복직 (R75). 새 임시 비밀번호를 발급한다 */
+	@PostMapping("/staff/{id}/reinstatement")
+	StaffAccountService.Created reinstate(@PathVariable long id, @RequestBody ReasonRequest r) {
+		return accounts.reinstate(id, r.reason());
+	}
+
+	@GetMapping("/staff/status-changes")
+	List<StaffAccountService.StatusChange> statusChanges() {
+		return accounts.changes();
 	}
 
 	@PostMapping("/staff/{id}/unlock")

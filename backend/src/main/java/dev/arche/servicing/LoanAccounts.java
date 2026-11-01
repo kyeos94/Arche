@@ -58,6 +58,12 @@ public interface LoanAccounts {
 	/** 일마감 ②~④: 열린 계약 전체를 nextDate 기준으로 재생해 연체·상실을 판정 (R24) */
 	JudgeReport judgeAll(LocalDate nextDate);
 
+	/** 직원 퇴사 (R75): 그 직원이 담당하는 완제 전 계약 수 */
+	int countAssigned(long staffId);
+
+	/** 직원 퇴사 (R75): 완제 전 담당 계약을 다른 직원에게 넘긴다. 넘긴 계약 수 */
+	int reassignAssigned(long fromStaffId, long toStaffId);
+
 	/** 일마감 ⑤: 계약 요약 잔액 = 원장 합계 검증. 불일치 계약 수 */
 	int reconcile();
 

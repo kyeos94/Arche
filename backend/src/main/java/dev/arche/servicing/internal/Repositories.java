@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,6 +29,13 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 
 	@Query("select a.id from LoanAccount a where a.status <> 'PAID_OFF' order by a.id")
 	List<Long> findOpenIds();
+
+	@Query("select count(a) from LoanAccount a where a.assignedStaffId = :s and a.status <> 'PAID_OFF'")
+	long countOpenAssigned(@Param("s") long staffId);
+
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("update LoanAccount a set a.assignedStaffId = :to where a.assignedStaffId = :from and a.status <> 'PAID_OFF'")
+	int reassignOpen(@Param("from") long from, @Param("to") long to);
 
 	List<LoanAccount> findByPaidOffOn(LocalDate paidOffOn);
 

@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -32,6 +33,7 @@ class Staff extends BaseEntity {
 	private int failedAttempts;
 	private boolean locked;
 	private boolean enabled;
+	private OffsetDateTime resignedAt;
 
 	protected Staff() {
 	}
@@ -68,6 +70,23 @@ class Staff extends BaseEntity {
 	void changeRole(Role newRole, Long newTeamId) {
 		this.role = newRole;
 		this.teamId = newTeamId;
+	}
+
+	/** 퇴사 (R75): 로그인할 수 없게 하고 퇴사 시각을 남긴다. 검증·담당 건 이관은 호출하는 쪽 */
+	void resign(OffsetDateTime at) {
+		enabled = false;
+		resignedAt = at;
+	}
+
+	/** 복직 (R75): 다시 로그인할 수 있게 하되 첫 로그인에 비밀번호를 바꾸게 한다 */
+	void reinstate(String newHash, LocalDate today) {
+		enabled = true;
+		resignedAt = null;
+		resetPassword(newHash, today);
+	}
+
+	OffsetDateTime resignedAt() {
+		return resignedAt;
 	}
 
 	void unlock() {

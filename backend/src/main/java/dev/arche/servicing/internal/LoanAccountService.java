@@ -454,6 +454,18 @@ class LoanAccountService implements LoanAccounts {
 
 	@Override
 	@Transactional(readOnly = true)
+	public int countAssigned(long staffId) {
+		return (int) accounts.countOpenAssigned(staffId);
+	}
+
+	@Override
+	@Transactional
+	public int reassignAssigned(long fromStaffId, long toStaffId) {
+		return accounts.reassignOpen(fromStaffId, toStaffId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public int reconcile() {
 		int mismatches = 0;
 		for (LoanAccount a : accounts.findAll()) {
