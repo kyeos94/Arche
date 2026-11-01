@@ -1,8 +1,10 @@
 import type { DailyReport, JournalReport, Provision, ReportLine, RollRate } from '@/api/reportTypes'
+import { PagedList } from '@/components/Pagination'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
@@ -204,10 +206,8 @@ export function ProvisionView({ data }: { data: Provision }) {
   )
 }
 
-const LINE_LIMIT = 500
-
 export function JournalView({ data }: { data: JournalReport }) {
-  // 계정별 합계 표는 계정 순서·합계 행이 고정이라 정렬하지 않는다. 거래별 분개 행만 정렬 (정렬 후 앞 LINE_LIMIT행)
+  // 계정별 합계 표는 계정 순서·합계 행이 고정이라 정렬·페이징하지 않는다. 거래별 분개 행만 정렬 후 페이징
   const { sorted, header } = useSort(data.lines, {
     entry: (l) => l.entryId,
     accountNo: (l) => l.accountNo,
@@ -218,6 +218,7 @@ export function JournalView({ data }: { data: JournalReport }) {
     credit: (l) => l.credit || null,
     memo: (l) => l.memo,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -264,41 +265,40 @@ export function JournalView({ data }: { data: JournalReport }) {
       </Table>
       <details className="text-xs">
         <summary className="cursor-pointer">거래별 분개 {formatNumber(data.lines.length)}행</summary>
-        <Table className="mt-2">
-          <THead>
-            <TR>
-              <SortTH {...header('entry')}>원장</SortTH>
-              <SortTH {...header('accountNo')}>계약번호</SortTH>
-              <SortTH {...header('posting')}>거래유형</SortTH>
-              <SortTH {...header('account')}>계정</SortTH>
-              <SortTH {...header('debit')} className="text-right">
-                차변
-              </SortTH>
-              <SortTH {...header('credit')} className="text-right">
-                대변
-              </SortTH>
-              <SortTH {...header('memo')}>적요</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {sorted.slice(0, LINE_LIMIT).map((l, i) => (
-              <TR key={`${l.entryId}-${i}`} className={cn(l.unmapped && 'text-destructive')}>
-                <TD>#{l.entryId}</TD>
-                <TD>{l.accountNo}</TD>
-                <TD>{l.postingLabel}</TD>
-                <TD>
-                  {l.accountCode} {l.accountName}
-                </TD>
-                <TD className="num">{l.debit ? formatMoney(l.debit) : ''}</TD>
-                <TD className="num">{l.credit ? formatMoney(l.credit) : ''}</TD>
-                <TD>{l.memo}</TD>
+        <PagedList paging={paging.props} className="mt-2">
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('entry')}>원장</SortTH>
+                <SortTH {...header('accountNo')}>계약번호</SortTH>
+                <SortTH {...header('posting')}>거래유형</SortTH>
+                <SortTH {...header('account')}>계정</SortTH>
+                <SortTH {...header('debit')} className="text-right">
+                  차변
+                </SortTH>
+                <SortTH {...header('credit')} className="text-right">
+                  대변
+                </SortTH>
+                <SortTH {...header('memo')}>적요</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
-        {data.lines.length > LINE_LIMIT && (
-          <p className="mt-1 text-muted-foreground">앞 {LINE_LIMIT}행만 보여 줍니다. 전체는 엑셀로 내려받으세요.</p>
-        )}
+            </THead>
+            <TBody>
+              {paging.rows.map((l, i) => (
+                <TR key={`${l.entryId}-${i}`} className={cn(l.unmapped && 'text-destructive')}>
+                  <TD>#{l.entryId}</TD>
+                  <TD>{l.accountNo}</TD>
+                  <TD>{l.postingLabel}</TD>
+                  <TD>
+                    {l.accountCode} {l.accountName}
+                  </TD>
+                  <TD className="num">{l.debit ? formatMoney(l.debit) : ''}</TD>
+                  <TD className="num">{l.credit ? formatMoney(l.credit) : ''}</TD>
+                  <TD>{l.memo}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </details>
     </div>
   )

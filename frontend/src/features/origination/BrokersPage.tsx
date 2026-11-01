@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import type { z } from 'zod'
 import { type Broker, type Commission, origination, originationKeys } from '@/api/origination'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ import { Field, Input } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { brokerRateSchema, brokerSchema } from './labels'
 
@@ -120,6 +122,7 @@ function BrokerDetail({ broker }: { broker: Broker }) {
     to: (r) => r.validTo ?? '9999-12-31',
     reason: (r) => r.reason,
   })
+  const ratePaging = usePaging(rates.sorted)
   const commissions = useSort(d?.commissions, {
     date: (c) => c.occurredOn,
     application: (c) => c.applicationNo,
@@ -129,6 +132,7 @@ function BrokerDetail({ broker }: { broker: Broker }) {
     amount: (c) => c.amount,
     reason: (c) => c.reason,
   })
+  const commissionPaging = usePaging(commissions.sorted)
   return (
     <Card>
       <CardHeader>
@@ -152,28 +156,30 @@ function BrokerDetail({ broker }: { broker: Broker }) {
         <ErrorMessage error={toggle.error ?? rotate.error} />
         <div>
           <h3 className="mb-1 text-xs font-semibold">수수료율 이력 [시작일, 종료일)</h3>
-          <Table aria-label="수수료율 이력">
-            <THead>
-              <TR>
-                <SortTH {...rates.header('rate')} className="text-right">
-                  수수료율
-                </SortTH>
-                <SortTH {...rates.header('from')}>시작일</SortTH>
-                <SortTH {...rates.header('to')}>종료일</SortTH>
-                <SortTH {...rates.header('reason')}>사유</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {rates.sorted.map((r) => (
-                <TR key={r.id}>
-                  <TD className="num">{formatRate(r.rate)}</TD>
-                  <TD>{formatDate(r.validFrom)}</TD>
-                  <TD>{r.validTo ? formatDate(r.validTo) : '현재'}</TD>
-                  <TD className="text-muted-foreground">{r.reason}</TD>
+          <PagedList paging={ratePaging.props}>
+            <Table aria-label="수수료율 이력">
+              <THead>
+                <TR>
+                  <SortTH {...rates.header('rate')} className="text-right">
+                    수수료율
+                  </SortTH>
+                  <SortTH {...rates.header('from')}>시작일</SortTH>
+                  <SortTH {...rates.header('to')}>종료일</SortTH>
+                  <SortTH {...rates.header('reason')}>사유</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {ratePaging.rows.map((r) => (
+                  <TR key={r.id}>
+                    <TD className="num">{formatRate(r.rate)}</TD>
+                    <TD>{formatDate(r.validFrom)}</TD>
+                    <TD>{r.validTo ? formatDate(r.validTo) : '현재'}</TD>
+                    <TD className="text-muted-foreground">{r.reason}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
           {manage && (
             <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={rateForm.handleSubmit((v) => changeRate.mutate(v))}>
               <Field label="새 수수료율(%)" htmlFor="crRate" error={re.rate?.message}>
@@ -199,43 +205,45 @@ function BrokerDetail({ broker }: { broker: Broker }) {
             정산·환수 (정산 {formatMoney(d?.settledTotal)} · 환수 {formatMoney(d?.clawbackTotal)} · 순액{' '}
             {formatMoney(d ? d.settledTotal + d.clawbackTotal : null)})
           </h3>
-          <Table aria-label="정산·환수">
-            <THead>
-              <TR>
-                <SortTH {...commissions.header('date')}>일자</SortTH>
-                <SortTH {...commissions.header('application')}>신청</SortTH>
-                <SortTH {...commissions.header('type')}>구분</SortTH>
-                <SortTH {...commissions.header('base')} className="text-right">
-                  실행금액
-                </SortTH>
-                <SortTH {...commissions.header('rate')} className="text-right">
-                  수수료율
-                </SortTH>
-                <SortTH {...commissions.header('amount')} className="text-right">
-                  금액
-                </SortTH>
-                <SortTH {...commissions.header('reason')}>사유</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {d?.commissions.length === 0 && <EmptyRow colSpan={7} />}
-              {commissions.sorted.map((c) => (
-                <TR key={c.id}>
-                  <TD>{formatDate(c.occurredOn)}</TD>
-                  <TD>
-                    <Link className="text-primary hover:underline" to={`/applications/${c.applicationId}`}>
-                      {c.applicationNo}
-                    </Link>
-                  </TD>
-                  <TD>{commissionTypeLabel(c)}</TD>
-                  <TD className="num">{formatMoney(c.baseAmount)}</TD>
-                  <TD className="num">{formatRate(c.rate)}</TD>
-                  <TD className="num">{formatMoney(c.amount)}</TD>
-                  <TD className="text-muted-foreground">{c.reason ?? ''}</TD>
+          <PagedList paging={commissionPaging.props}>
+            <Table aria-label="정산·환수">
+              <THead>
+                <TR>
+                  <SortTH {...commissions.header('date')}>일자</SortTH>
+                  <SortTH {...commissions.header('application')}>신청</SortTH>
+                  <SortTH {...commissions.header('type')}>구분</SortTH>
+                  <SortTH {...commissions.header('base')} className="text-right">
+                    실행금액
+                  </SortTH>
+                  <SortTH {...commissions.header('rate')} className="text-right">
+                    수수료율
+                  </SortTH>
+                  <SortTH {...commissions.header('amount')} className="text-right">
+                    금액
+                  </SortTH>
+                  <SortTH {...commissions.header('reason')}>사유</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {d?.commissions.length === 0 && <EmptyRow colSpan={7} />}
+                {commissionPaging.rows.map((c) => (
+                  <TR key={c.id}>
+                    <TD>{formatDate(c.occurredOn)}</TD>
+                    <TD>
+                      <Link className="text-primary hover:underline" to={`/applications/${c.applicationId}`}>
+                        {c.applicationNo}
+                      </Link>
+                    </TD>
+                    <TD>{commissionTypeLabel(c)}</TD>
+                    <TD className="num">{formatMoney(c.baseAmount)}</TD>
+                    <TD className="num">{formatRate(c.rate)}</TD>
+                    <TD className="num">{formatMoney(c.amount)}</TD>
+                    <TD className="text-muted-foreground">{c.reason ?? ''}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </div>
       </CardContent>
     </Card>
@@ -261,6 +269,7 @@ export function BrokersPage() {
     ips: (b) => b.allowedIps,
     status: (b) => (b.status === 'ACTIVE' ? '거래 중' : '정지'),
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -279,39 +288,41 @@ export function BrokersPage() {
       <p className="text-[11px] text-muted-foreground">
         수수료 = 실행금액 × 실행일 수수료율(원 미만 절사). 실행일부터 3개월 안 완제 또는 1년 안 불완전판매 확인 시 전액 환수 (R56).
       </p>
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('no')}>번호</SortTH>
-            <SortTH {...header('name')}>이름</SortTH>
-            <SortTH {...header('registrationNo')}>등록 번호</SortTH>
-            <SortTH {...header('rate')} className="text-right">
-              현재 수수료율
-            </SortTH>
-            <SortTH {...header('ips')}>허용 IP</SortTH>
-            <SortTH {...header('status')}>상태</SortTH>
-            <TH />
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {sorted.map((b) => (
-            <TR key={b.id}>
-              <TD>{b.brokerNo}</TD>
-              <TD>{b.name}</TD>
-              <TD>{b.registrationNo}</TD>
-              <TD className="num">{formatRate(b.currentRate)}</TD>
-              <TD className="text-muted-foreground">{b.allowedIps ?? '제한 없음'}</TD>
-              <TD>{b.status === 'ACTIVE' ? '거래 중' : '정지'}</TD>
-              <TD>
-                <Button size="sm" variant={selected === b.id ? 'default' : 'outline'} onClick={() => setSelected(b.id)}>
-                  상세
-                </Button>
-              </TD>
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('no')}>번호</SortTH>
+              <SortTH {...header('name')}>이름</SortTH>
+              <SortTH {...header('registrationNo')}>등록 번호</SortTH>
+              <SortTH {...header('rate')} className="text-right">
+                현재 수수료율
+              </SortTH>
+              <SortTH {...header('ips')}>허용 IP</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <TH />
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.length === 0 && <EmptyRow colSpan={7} />}
+            {paging.rows.map((b) => (
+              <TR key={b.id}>
+                <TD>{b.brokerNo}</TD>
+                <TD>{b.name}</TD>
+                <TD>{b.registrationNo}</TD>
+                <TD className="num">{formatRate(b.currentRate)}</TD>
+                <TD className="text-muted-foreground">{b.allowedIps ?? '제한 없음'}</TD>
+                <TD>{b.status === 'ACTIVE' ? '거래 중' : '정지'}</TD>
+                <TD>
+                  <Button size="sm" variant={selected === b.id ? 'default' : 'outline'} onClick={() => setSelected(b.id)}>
+                    상세
+                  </Button>
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
       {broker && <BrokerDetail key={broker.id} broker={broker} />}
     </div>
   )

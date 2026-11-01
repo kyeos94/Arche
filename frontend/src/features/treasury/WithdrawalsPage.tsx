@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ import {
 } from '@/features/communication/api'
 import { withdrawalSchema } from '@/features/communication/schemas'
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 const OPEN_STATUSES = 'REQUESTED,FIRST_APPROVED,SENDING,UNKNOWN'
@@ -39,6 +41,7 @@ export function WithdrawalsPage() {
     requested: (w) => w.requestedOn,
     status: (w) => sliceLabel(w.status),
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <Can permission="withdrawal.create">
@@ -67,30 +70,32 @@ export function WithdrawalsPage() {
         </CardHeader>
         <CardContent>
           <ErrorMessage error={q.error} />
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('no')}>번호</SortTH>
-                <SortTH {...header('type')}>유형</SortTH>
-                <SortTH {...header('amount')} className="text-right">
-                  금액
-                </SortTH>
-                <TH>받는 계좌</TH>
-                <SortTH {...header('reason')}>사유</SortTH>
-                <SortTH {...header('requested')}>작성</SortTH>
-                <TH>승인</TH>
-                <SortTH {...header('status')}>상태</SortTH>
-                <TH>결과</TH>
-                <TH />
-              </TR>
-            </THead>
-            <TBody>
-              {q.data?.length === 0 && <EmptyRow colSpan={10} />}
-              {sorted.map((w) => (
-                <WithdrawalRow key={w.id} w={w} />
-              ))}
-            </TBody>
-          </Table>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('no')}>번호</SortTH>
+                  <SortTH {...header('type')}>유형</SortTH>
+                  <SortTH {...header('amount')} className="text-right">
+                    금액
+                  </SortTH>
+                  <TH>받는 계좌</TH>
+                  <SortTH {...header('reason')}>사유</SortTH>
+                  <SortTH {...header('requested')}>작성</SortTH>
+                  <TH>승인</TH>
+                  <SortTH {...header('status')}>상태</SortTH>
+                  <TH>결과</TH>
+                  <TH />
+                </TR>
+              </THead>
+              <TBody>
+                {q.data?.length === 0 && <EmptyRow colSpan={10} />}
+                {paging.rows.map((w) => (
+                  <WithdrawalRow key={w.id} w={w} />
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
     </div>

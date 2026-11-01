@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { type Underwriter, origination, originationKeys } from '@/api/origination'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDateTime } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 function ProfileEditor({ u, codes }: { u: Underwriter; codes: string[] }) {
@@ -56,6 +58,7 @@ export function UnderwritersPage() {
     products: (u) => (u.allProducts ? '전 상품' : u.productCodes.join(', ') || '없음'),
     status: (u) => (u.available ? '배정 가능' : '부재'),
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">심사자 배정</h1>
@@ -69,41 +72,43 @@ export function UnderwritersPage() {
         </CardContent>
       </Card>
       <ErrorMessage error={q.error} />
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('name')}>이름</SortTH>
-            <SortTH {...header('role')}>역할</SortTH>
-            <SortTH {...header('pending')} className="text-right">
-              미처리
-            </SortTH>
-            <SortTH {...header('lastAssigned')}>마지막 배정</SortTH>
-            <SortTH {...header('products')}>담당 상품</SortTH>
-            <SortTH {...header('status')}>상태</SortTH>
-            {editable && <TH>프로필</TH>}
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.underwriters.length === 0 && <EmptyRow colSpan={editable ? 7 : 6} />}
-          {sorted.map((u) => (
-            <TR key={u.staffId}>
-              <TD>
-                {u.name} <span className="text-muted-foreground">({u.loginId})</span>
-              </TD>
-              <TD>{u.role === 'UNDERWRITER' ? '심사역' : '심사팀장'}</TD>
-              <TD className="num">{u.pending}</TD>
-              <TD>{formatDateTime(u.lastAssignedAt)}</TD>
-              <TD>{u.allProducts ? '전 상품' : u.productCodes.join(', ') || '없음'}</TD>
-              <TD>{u.available ? '배정 가능' : '부재'}</TD>
-              {editable && (
-                <TD>
-                  <ProfileEditor key={`${u.staffId}-${u.productCodes.join()}-${u.available}`} u={u} codes={codes} />
-                </TD>
-              )}
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('name')}>이름</SortTH>
+              <SortTH {...header('role')}>역할</SortTH>
+              <SortTH {...header('pending')} className="text-right">
+                미처리
+              </SortTH>
+              <SortTH {...header('lastAssigned')}>마지막 배정</SortTH>
+              <SortTH {...header('products')}>담당 상품</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              {editable && <TH>프로필</TH>}
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.underwriters.length === 0 && <EmptyRow colSpan={editable ? 7 : 6} />}
+            {paging.rows.map((u) => (
+              <TR key={u.staffId}>
+                <TD>
+                  {u.name} <span className="text-muted-foreground">({u.loginId})</span>
+                </TD>
+                <TD>{u.role === 'UNDERWRITER' ? '심사역' : '심사팀장'}</TD>
+                <TD className="num">{u.pending}</TD>
+                <TD>{formatDateTime(u.lastAssignedAt)}</TD>
+                <TD>{u.allProducts ? '전 상품' : u.productCodes.join(', ') || '없음'}</TD>
+                <TD>{u.available ? '배정 가능' : '부재'}</TD>
+                {editable && (
+                  <TD>
+                    <ProfileEditor key={`${u.staffId}-${u.productCodes.join()}-${u.available}`} u={u} codes={codes} />
+                  </TD>
+                )}
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }
