@@ -5,10 +5,11 @@ import { ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { useInvalidateLoan } from '@/features/loans/hooks'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatDate, formatMoney, statusLabel } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 const typeLabels: Record<string, string> = { CANCEL: '취소', MOVE: '계약 이동', AMOUNT_FIX: '금액 정정' }
 
@@ -23,6 +24,17 @@ export function CorrectionsPage() {
     onSuccess: () => invalidate(),
   })
   const canApprove = can('payment.cancel.closed.approve')
+  const { sorted, header } = useSort(q.data, {
+    correctionNo: (c) => c.correctionNo,
+    type: (c) => typeLabels[c.type] ?? c.type,
+    paymentId: (c) => c.originalPaymentId,
+    target: (c) => c.targetAccountId,
+    amount: (c) => c.correctedAmount,
+    reason: (c) => c.reason,
+    afterClose: (c) => (c.afterClose ? '예' : '아니오'),
+    requestedOn: (c) => c.requestedOn,
+    status: (c) => statusLabel(c.status),
+  })
 
   return (
     <div className="space-y-3">
@@ -38,21 +50,23 @@ export function CorrectionsPage() {
       <Table>
         <THead>
           <TR>
-            <TH>정정번호</TH>
-            <TH>유형</TH>
-            <TH>원 입금 #</TH>
-            <TH>대상 계약</TH>
-            <TH className="text-right">정정 금액</TH>
-            <TH>사유</TH>
-            <TH>마감 후</TH>
-            <TH>요청일</TH>
-            <TH>상태</TH>
+            <SortTH {...header('correctionNo')}>정정번호</SortTH>
+            <SortTH {...header('type')}>유형</SortTH>
+            <SortTH {...header('paymentId')}>원 입금 #</SortTH>
+            <SortTH {...header('target')}>대상 계약</SortTH>
+            <SortTH {...header('amount')} className="text-right">
+              정정 금액
+            </SortTH>
+            <SortTH {...header('reason')}>사유</SortTH>
+            <SortTH {...header('afterClose')}>마감 후</SortTH>
+            <SortTH {...header('requestedOn')}>요청일</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
             <TH />
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={10} />}
-          {q.data?.map((c) => (
+          {sorted.map((c) => (
             <TR key={c.id}>
               <TD>{c.correctionNo}</TD>
               <TD>{typeLabels[c.type] ?? c.type}</TD>

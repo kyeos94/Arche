@@ -6,9 +6,10 @@ import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { buildPrintDocument, fitPages, printHtml } from '@/lib/print'
+import { useSort } from '@/lib/useSort'
 
 /** 계약 상세 "양식인쇄" 탭 (R72): 양식을 골라 미리보고 1건 인쇄 */
 export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> }) {
@@ -23,6 +24,13 @@ export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> 
     staleTime: 0,
   })
   const log = useQuery({ queryKey: documentKeys.printLog(loan.id), queryFn: () => documents.printLog(loan.id) })
+  const { sorted: logRows, header } = useSort(log.data, {
+    printedAt: (r) => r.printedAt,
+    businessDate: (r) => r.businessDate,
+    template: (r) => r.templateName,
+    documentNo: (r) => r.documentNo,
+    printedBy: (r) => r.printedBy,
+  })
   const print = useMutation({
     mutationFn: () => documents.render({ templateCode: code, accountIds: [loan.id], purpose: 'PRINT' }),
     onSuccess: async (result) => {
@@ -91,16 +99,16 @@ export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> 
           <Table>
             <THead>
               <TR>
-                <TH>일시</TH>
-                <TH>업무일자</TH>
-                <TH>양식</TH>
-                <TH>문서번호</TH>
-                <TH>인쇄한 직원</TH>
+                <SortTH {...header('printedAt')}>일시</SortTH>
+                <SortTH {...header('businessDate')}>업무일자</SortTH>
+                <SortTH {...header('template')}>양식</SortTH>
+                <SortTH {...header('documentNo')}>문서번호</SortTH>
+                <SortTH {...header('printedBy')}>인쇄한 직원</SortTH>
               </TR>
             </THead>
             <TBody>
               {log.data?.length === 0 && <EmptyRow colSpan={5}>인쇄한 양식이 없습니다</EmptyRow>}
-              {log.data?.map((r) => (
+              {logRows.map((r) => (
                 <TR key={r.id}>
                   <TD className="whitespace-nowrap">{formatDateTime(r.printedAt)}</TD>
                   <TD>{formatDate(r.businessDate)}</TD>
