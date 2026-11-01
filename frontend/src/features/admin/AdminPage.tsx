@@ -1,10 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { staffRoleKeys, staffRoles } from '@/api/adminConsole'
+import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
-import { useAuth } from '@/features/auth/auth'
-import { StaffRoleDialog } from './StaffRoleDialog'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
@@ -95,126 +92,6 @@ function Closing() {
   )
 }
 
-function StaffList() {
-  const client = useQueryClient()
-  const { me } = useAuth()
-  const staff = useQuery({ queryKey: queryKeys.staff, queryFn: endpoints.staff })
-  const options = useQuery({ queryKey: staffRoleKeys.options, queryFn: staffRoles.options })
-  const teamName = (id: number | null) => options.data?.teams.find((t) => t.id === id)?.name ?? id ?? '-'
-  const unlock = useMutation({
-    mutationFn: endpoints.unlockStaff,
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.staff }),
-  })
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>직원</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ErrorMessage error={staff.error ?? unlock.error} />
-        <Table>
-          <THead>
-            <TR>
-              <TH>ID</TH>
-              <TH>아이디</TH>
-              <TH>이름</TH>
-              <TH>역할</TH>
-              <TH>팀</TH>
-              <TH>로그인 실패</TH>
-              <TH>상태</TH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {staff.data?.map((s) => (
-              <TR key={s.id}>
-                <TD>{s.id}</TD>
-                <TD>{s.loginId}</TD>
-                <TD>{s.name}</TD>
-                <TD>{s.roleLabel}</TD>
-                <TD>{teamName(s.teamId)}</TD>
-                <TD className="num">{s.failedAttempts}</TD>
-                <TD>
-                  {s.locked ? (
-                    <Badge className="border-red-200 bg-red-50 text-red-700">잠김</Badge>
-                  ) : (
-                    <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">정상</Badge>
-                  )}
-                </TD>
-                <TD className="space-x-1 whitespace-nowrap">
-                  {options.data && (
-                    <StaffRoleDialog
-                      staff={s}
-                      options={options.data}
-                      disabledReason={
-                        s.id === me?.id
-                          ? '자기 역할은 바꿀 수 없습니다'
-                          : s.role === 'DEMO_ALL'
-                            ? '데모 전용 계정은 바꿀 수 없습니다'
-                            : undefined
-                      }
-                    />
-                  )}
-                  {s.locked && (
-                    <Button size="sm" variant="outline" onClick={() => unlock.mutate(s.id)}>
-                      잠금 해제
-                    </Button>
-                  )}
-                </TD>
-              </TR>
-            ))}
-          </TBody>
-        </Table>
-      </CardContent>
-    </Card>
-  )
-}
-
-function RoleChanges() {
-  const changes = useQuery({ queryKey: staffRoleKeys.changes, queryFn: staffRoles.changes })
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>역할 변경 이력</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ErrorMessage error={changes.error} />
-        <Table>
-          <THead>
-            <TR>
-              <TH>일시</TH>
-              <TH>직원</TH>
-              <TH>변경 전</TH>
-              <TH>변경 후</TH>
-              <TH>처리자</TH>
-              <TH>사유</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {changes.data?.length === 0 && <EmptyRow colSpan={6}>역할을 바꾼 직원이 없습니다</EmptyRow>}
-            {changes.data?.map((c) => (
-              <TR key={c.id}>
-                <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
-                <TD>
-                  {c.staffName} ({c.loginId})
-                </TD>
-                <TD>
-                  {c.fromRole} · {c.fromTeam ?? '-'}
-                </TD>
-                <TD>
-                  {c.toRole} · {c.toTeam ?? '-'}
-                </TD>
-                <TD>{c.changedBy}</TD>
-                <TD>{c.reason}</TD>
-              </TR>
-            ))}
-          </TBody>
-        </Table>
-      </CardContent>
-    </Card>
-  )
-}
-
 function AccessLogs() {
   const logs = useQuery({ queryKey: queryKeys.accessLogs, queryFn: endpoints.accessLogs })
   return (
@@ -261,8 +138,10 @@ export function AdminPage() {
     <div className="space-y-3">
       <h1 className="text-base font-semibold">운영 관리</h1>
       <Closing />
-      <StaffList />
-      <RoleChanges />
+      <p className="text-xs text-muted-foreground">
+        직원 등록·역할 변경·퇴사는 <Link to="/admin/staff" className="text-primary hover:underline">시스템설정 &gt; 직원 관리</Link>에서
+        합니다.
+      </p>
       <AccessLogs />
     </div>
   )

@@ -517,6 +517,9 @@ export interface StaffRow {
   teamId: number | null
   locked: boolean
   failedAttempts: number
+  /** false면 퇴사 (R75) */
+  enabled: boolean
+  resignedAt: string | null
 }
 
 export interface AccessLogRow {

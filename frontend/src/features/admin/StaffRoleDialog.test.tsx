@@ -31,6 +31,8 @@ const STAFF: StaffRow = {
   teamId: 2,
   locked: false,
   failedAttempts: 0,
+  enabled: true,
+  resignedAt: null,
 }
 
 afterEach(() => vi.unstubAllGlobals())

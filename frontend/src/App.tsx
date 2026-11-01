@@ -5,6 +5,7 @@ import { AdminPage } from '@/features/admin/AdminPage'
 import { HolidayAdminPage } from '@/features/admin/HolidayAdminPage'
 import { MenuAdminPage } from '@/features/admin/MenuAdminPage'
 import { NotesPage } from '@/features/notes/NotesPage'
+import { StaffAdminPage } from '@/features/admin/StaffAdminPage'
 import { PermissionAdminPage } from '@/features/admin/PermissionAdminPage'
 import { useAuth } from '@/features/auth/auth'
 import { LoginPage } from '@/features/auth/LoginPage'
@@ -76,6 +77,7 @@ function StaffApp() {
         <Route path="admin/menus" element={<MenuAdminPage />} />
         <Route path="admin/permissions" element={<PermissionAdminPage />} />
         <Route path="admin/holidays" element={<HolidayAdminPage />} />
+        <Route path="admin/staff" element={<StaffAdminPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="withdrawals" element={<WithdrawalsPage />} />
         <Route path="message-templates" element={<TemplatesPage />} />

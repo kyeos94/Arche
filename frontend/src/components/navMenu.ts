@@ -44,6 +44,7 @@ export const SCREENS: Record<string, Screen> = {
   '/legal-actions': { label: '법조치 현황', permission: 'loan.read' },
   '/reports': { label: '보고서', permission: 'report.read' },
   '/admin': { label: '운영 관리', permission: 'admin.manage' },
+  '/admin/staff': { label: '직원 관리', permission: 'admin.manage' },
   '/admin/menus': { label: '메뉴 관리', permission: 'admin.manage' },
   '/admin/permissions': { label: '권한 관리', permission: 'admin.manage' },
   '/admin/holidays': { label: '휴일 관리', permission: 'admin.manage' },
@@ -63,7 +64,7 @@ export interface MenuGroupInput {
   items: { path: string; label: string }[]
 }
 
-/** 처음 설치했을 때의 메뉴 (V18·V22·V23 시드와 같음) */
+/** 처음 설치했을 때의 메뉴 (V18·V22·V23·V24 시드와 같음, '/admin/staff'는 V24에서 '/admin' 바로 아래) */
 export const DEFAULT_MENU: MenuGroupInput[] = [
   {
     label: '대출신청관리',
@@ -81,6 +82,7 @@ export const DEFAULT_MENU: MenuGroupInput[] = [
     // '/admin/holidays'(V22)·'/notes'(V23)는 마이그레이션에서 그룹 끝에 붙였으므로 여기서도 끝에 둔다
     items: [
       '/admin',
+      '/admin/staff',
       '/admin/menus',
       '/admin/permissions',
       '/message-templates',

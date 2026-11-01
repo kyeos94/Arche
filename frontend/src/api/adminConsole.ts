@@ -119,3 +119,65 @@ export const staffRoles = {
     api.post<StaffRoleChange[]>(`/api/admin/staff/${id}/role`, body),
   changes: () => api.get<StaffRoleChange[]>('/api/admin/staff/role-changes'),
 }
+
+/** 직원 등록·퇴사·복직 (R75) */
+export interface CreatedStaff {
+  id: number
+  loginId: string
+  /** 이 응답에서 한 번만 받는다 */
+  temporaryPassword: string
+}
+
+export interface SuccessorCandidate {
+  id: number
+  name: string
+  roleLabel: string
+  team: string | null
+}
+
+export interface StaffWorkload {
+  staffId: number
+  name: string
+  roleLabel: string
+  loans: number
+  alerts: number
+  applications: number
+  loanSuccessors: SuccessorCandidate[]
+  applicationSuccessors: SuccessorCandidate[]
+}
+
+export interface ResignResult {
+  staffId: number
+  loans: number
+  alerts: number
+  applications: number
+  handover: string | null
+}
+
+export interface StaffStatusChange {
+  id: number
+  staffId: number
+  loginId: string
+  staffName: string
+  action: 'CREATE' | 'RESIGN' | 'REINSTATE'
+  reason: string
+  detail: string | null
+  changedBy: string
+  changedAt: string
+}
+
+export const staffAccountKeys = {
+  workload: (id: number) => ['admin', 'staff', id, 'workload'] as const,
+  changes: ['admin', 'staff', 'status-changes'] as const,
+}
+
+export const staffAccounts = {
+  create: (body: { loginId: string; name: string; role: string; teamId: number }) =>
+    api.post<CreatedStaff>('/api/admin/staff', body),
+  workload: (id: number) => api.get<StaffWorkload>(`/api/admin/staff/${id}/workload`),
+  resign: (id: number, body: { reason: string; loanSuccessorId: number | null; applicationSuccessorId: number | null }) =>
+    api.post<ResignResult>(`/api/admin/staff/${id}/resignation`, body),
+  reinstate: (id: number, reason: string) =>
+    api.post<CreatedStaff>(`/api/admin/staff/${id}/reinstatement`, { reason }),
+  changes: () => api.get<StaffStatusChange[]>('/api/admin/staff/status-changes'),
+}
