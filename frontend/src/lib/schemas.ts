@@ -130,3 +130,10 @@ export const openLoanSchema = z.object({
 export type LoginForm = z.infer<typeof loginSchema>
 export type PasswordChangeForm = z.infer<typeof passwordChangeSchema>
 export type CorrectionForm = z.infer<typeof correctionSchema>
+
+/** 엑셀 다운로드 사유 (R68 ②: 2~200자, 접근 기록에 남김) */
+export const downloadReasonSchema = z.object({
+  reason: z.string().trim().min(2, '다운로드 사유를 2자 이상 입력하세요').max(200, '200자 이내로 입력하세요'),
+})
+
+export type DownloadReasonForm = z.infer<typeof downloadReasonSchema>

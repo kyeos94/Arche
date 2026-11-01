@@ -7,13 +7,16 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
-import { formatDate, formatMoney, formatNumber } from '@/lib/format'
+import { formatDate, formatMoney, formatNumber, statusLabel } from '@/lib/format'
+import { useAuth } from '@/features/auth/auth'
+import { ExcelDownloadDialog } from '@/features/reports/ExcelDownloadDialog'
 import { StatusTabs } from './StatusTabs'
 
 /** 계약 목록: 검색 조건은 URL 쿼리스트링과 동기화 (뒤로 가기·새로고침·링크 공유) */
 export function LoanListPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const { can } = useAuth()
   const status = params.get('status') ?? ''
   const q = params.get('q') ?? ''
   const page = Number(params.get('page') ?? 0)
@@ -41,23 +44,32 @@ export function LoanListPage() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h1 className="text-base font-semibold">계약 목록</h1>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            update({ q: draft.trim(), page: '' })
-          }}
-        >
-          <Input
-            className="w-64"
-            placeholder="계약번호 또는 주민등록번호"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <Button type="submit" variant="outline">
-            검색
-          </Button>
-        </form>
+        <div className="flex gap-2">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              update({ q: draft.trim(), page: '' })
+            }}
+          >
+            <Input
+              className="w-64"
+              placeholder="계약번호 또는 주민등록번호"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <Button type="submit" variant="outline">
+              검색
+            </Button>
+          </form>
+          {can('excel.download') && (
+            <ExcelDownloadDialog
+              title="계약 목록 엑셀 다운로드"
+              summary={`현재 검색 조건 (상태: ${status ? statusLabel(status) : '전체'}${q ? ', 검색어 있음' : ''})의 계약 전체를 내려받습니다. 화면과 같은 조회 범위가 적용됩니다.`}
+              onDownload={(reason) => endpoints.exportLoans({ status: status || undefined, q: q || undefined, reason })}
+            />
+          )}
+        </div>
       </div>
       <StatusTabs counts={counts.data} value={status} onChange={(s) => update({ status: s, page: '' })} />
       <ErrorMessage error={list.error} />
