@@ -38,6 +38,10 @@ function Terms({ loan }: { loan: LoanDetail }) {
           <Row label="고객번호" value={loan.customer.customerNo} />
           <Row label="주민등록번호" value={loan.customer.residentNoMasked} />
           <Row label="연락처" value={loan.customer.phoneMasked ?? '-'} />
+          <Row
+            label="담당자"
+            value={loan.assignedStaffName ? `${loan.assignedStaffName}${loan.assignedStaffTeam ? ` (${loan.assignedStaffTeam})` : ''}` : '미배정'}
+          />
           <Row label="실행(양수)일" value={formatDate(loan.disbursedOn)} />
           <Row label="만기일" value={formatDate(loan.maturityDate)} />
           <Row label="실행 원금" value={formatMoney(loan.initialPrincipal)} />

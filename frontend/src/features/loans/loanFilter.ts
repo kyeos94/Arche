@@ -32,8 +32,8 @@ export const KEYWORD_TYPES = [
   { code: 'PHONE', label: '휴대폰번호' },
 ] as const
 
-export const PAGE_SIZES = [20, 50, 100, 200] as const
-export const DEFAULT_PAGE_SIZE = 50
+export { DEFAULT_PAGE_SIZE, PAGE_SIZES } from '@/lib/usePaging'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from '@/lib/usePaging'
 
 /** 서버가 정렬할 수 있는 칸 (LoanQuery.SORT_COLUMNS와 같음) */
 export const SERVER_SORT_KEYS = [

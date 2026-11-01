@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { LoanListItem } from '@/api/types'
-import { Pagination } from '@/components/Pagination'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
@@ -13,7 +13,7 @@ import { formatDate, formatMoney, formatNumber, statusLabel } from '@/lib/format
 import { type SortHeaderProps, type SortState, nextSort } from '@/lib/useSort'
 import { BulkActionBar } from './bulk/BulkActionBar'
 import { LoanFilterPanel } from './LoanFilterPanel'
-import { FILTER_KEYS, type FilterValues, PAGE_SIZES, activeCount, exportFilter, readFilter, readSearch } from './loanFilter'
+import { DEFAULT_PAGE_SIZE, FILTER_KEYS, type FilterValues, activeCount, exportFilter, readFilter, readSearch } from './loanFilter'
 import { StatusTabs } from './StatusTabs'
 
 /**
@@ -106,85 +106,85 @@ export function LoanListPage() {
       <LoanFilterPanel key={FILTER_KEYS.map((k) => filter[k] ?? '').join('|')} initial={filter} onApply={applyFilter} />
       <StatusTabs counts={counts.data} value={status} onChange={(s) => update({ status: s, page: undefined })} />
       <ErrorMessage error={list.error} />
-      <BulkActionBar selected={selected} onClear={() => setSelected(new Map())} />
-      <Table>
-        <THead>
-          <TR>
-            <TH className="w-8">
-              <input
-                type="checkbox"
-                aria-label="이 쪽 모두 선택"
-                checked={pageAllSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = !pageAllSelected && pageSomeSelected
-                }}
-                onChange={(e) => togglePage(e.target.checked)}
-                className="h-4 w-4 accent-primary"
-              />
-            </TH>
-            <SortTH {...header('accountNo')}>계약번호</SortTH>
-            <TH>고객명</TH>
-            <SortTH {...header('productCode')}>상품</SortTH>
-            <SortTH {...header('status')}>상태</SortTH>
-            <SortTH {...header('initialPrincipal')} className="text-right">
-              대출금액
-            </SortTH>
-            <SortTH {...header('principalBalance')} className="text-right">
-              원금 잔액
-            </SortTH>
-            <SortTH {...header('payoffAmount')} className="text-right">
-              완제 금액
-            </SortTH>
-            <SortTH {...header('delinquencyDays')} className="text-right">
-              연체일수
-            </SortTH>
-            <SortTH {...header('nextDueDate')}>다음 납입일</SortTH>
-            <SortTH {...header('disbursedOn')}>실행일</SortTH>
-            <TH>담당자</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {data?.content.length === 0 && <EmptyRow colSpan={12}>조건에 맞는 계약이 없습니다</EmptyRow>}
-          {data?.content.map((r) => (
-            <TR key={r.id} className="cursor-pointer" onClick={() => navigate(`/loans/${r.id}`)}>
-              {/* 체크박스 칸을 눌러도 상세로 가지 않게 */}
-              <TD onClick={(e) => e.stopPropagation()}>
+      <PagedList
+        toolbar={<BulkActionBar selected={selected} onClear={() => setSelected(new Map())} />}
+        paging={{
+          page,
+          totalPages: data?.totalPages ?? 1,
+          totalElements: data?.totalElements ?? 0,
+          size: search.size ?? DEFAULT_PAGE_SIZE,
+          onPage: (p) => update({ page: p > 0 ? String(p) : undefined }),
+          onSize: (s) => update({ size: String(s), page: undefined }),
+        }}
+      >
+        <Table>
+          <THead>
+            <TR>
+              <TH className="w-8">
                 <input
                   type="checkbox"
-                  aria-label={`${r.accountNo} 선택`}
-                  checked={selectedMap.has(r.id)}
-                  onChange={(e) => toggle(r, e.target.checked)}
+                  aria-label="이 쪽 모두 선택"
+                  checked={pageAllSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !pageAllSelected && pageSomeSelected
+                  }}
+                  onChange={(e) => togglePage(e.target.checked)}
                   className="h-4 w-4 accent-primary"
                 />
-              </TD>
-              <TD className="font-medium text-primary">{r.accountNo}</TD>
-              <TD>{r.customerName}</TD>
-              <TD>{r.productCode}</TD>
-              <TD>
-                <StatusBadge status={r.status} />
-              </TD>
-              <TD className="num">{formatMoney(r.initialPrincipal)}</TD>
-              <TD className="num">{formatMoney(r.principalBalance)}</TD>
-              <TD className="num">{formatMoney(r.payoffAmount)}</TD>
-              <TD className="num">{r.delinquencyDays > 0 ? `${formatNumber(r.delinquencyDays)}일` : '-'}</TD>
-              <TD>{formatDate(r.nextDueDate)}</TD>
-              <TD>{formatDate(r.disbursedOn)}</TD>
-              <TD>{r.assignedStaffName ?? <span className="text-muted-foreground">미배정</span>}</TD>
+              </TH>
+              <SortTH {...header('accountNo')}>계약번호</SortTH>
+              <TH>고객명</TH>
+              <SortTH {...header('productCode')}>상품</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <SortTH {...header('initialPrincipal')} className="text-right">
+                대출금액
+              </SortTH>
+              <SortTH {...header('principalBalance')} className="text-right">
+                원금 잔액
+              </SortTH>
+              <SortTH {...header('payoffAmount')} className="text-right">
+                완제 금액
+              </SortTH>
+              <SortTH {...header('delinquencyDays')} className="text-right">
+                연체일수
+              </SortTH>
+              <SortTH {...header('nextDueDate')}>다음 납입일</SortTH>
+              <SortTH {...header('disbursedOn')}>실행일</SortTH>
+              <TH>담당자</TH>
             </TR>
-          ))}
-        </TBody>
-      </Table>
-      {data && (
-        <Pagination
-          page={page}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          size={search.size ?? 50}
-          sizes={PAGE_SIZES}
-          onPage={(p) => update({ page: p > 0 ? String(p) : undefined })}
-          onSize={(s) => update({ size: String(s), page: undefined })}
-        />
-      )}
+          </THead>
+          <TBody>
+            {data?.content.length === 0 && <EmptyRow colSpan={12}>조건에 맞는 계약이 없습니다</EmptyRow>}
+            {data?.content.map((r) => (
+              <TR key={r.id} className="cursor-pointer" onClick={() => navigate(`/loans/${r.id}`)}>
+                {/* 체크박스 칸을 눌러도 상세로 가지 않게 */}
+                <TD onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`${r.accountNo} 선택`}
+                    checked={selectedMap.has(r.id)}
+                    onChange={(e) => toggle(r, e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </TD>
+                <TD className="font-medium text-primary">{r.accountNo}</TD>
+                <TD>{r.customerName}</TD>
+                <TD>{r.productCode}</TD>
+                <TD>
+                  <StatusBadge status={r.status} />
+                </TD>
+                <TD className="num">{formatMoney(r.initialPrincipal)}</TD>
+                <TD className="num">{formatMoney(r.principalBalance)}</TD>
+                <TD className="num">{formatMoney(r.payoffAmount)}</TD>
+                <TD className="num">{r.delinquencyDays > 0 ? `${formatNumber(r.delinquencyDays)}일` : '-'}</TD>
+                <TD>{formatDate(r.nextDueDate)}</TD>
+                <TD>{formatDate(r.disbursedOn)}</TD>
+                <TD>{r.assignedStaffName ?? <span className="text-muted-foreground">미배정</span>}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

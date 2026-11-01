@@ -106,7 +106,8 @@ class LoanController {
 			long payoffAmount, long prepaymentFeeToday, int delinquencyDays, LocalDate delinquentSince,
 			LocalDate nextDueDate, LocalDate acceleratedOn, LocalDate paidOffOn, LocalDate lastSettledOn,
 			LocalDate asOf, LocalDate businessDate, String virtualAccountNo, long totalPaid, long refundPending,
-			Long assignedStaffId, LocalDate limitationCompletionDate, Acquisition acquisition) {
+			Long assignedStaffId, LocalDate limitationCompletionDate, Acquisition acquisition,
+			String assignedStaffName, String assignedStaffTeam) {
 	}
 
 	record Acquisition(LocalDate acquiredOn, long acquisitionPrice, String seller, BigDecimal appliedRate,
@@ -368,6 +369,9 @@ class LoanController {
 						paymentDates.isEmpty() ? null
 								: java.time.temporal.ChronoUnit.DAYS.between(
 										paymentDates.stream().max(LocalDate::compareTo).orElseThrow(), today));
+		// 담당자: 퇴사자여도 이름은 보여 준다(퇴사 시 이관했다면 이미 후임으로 바뀌어 있음)
+		var assignee = a.assignedStaffId() == null ? java.util.Optional.<dev.arche.staff.CurrentStaff>empty()
+				: staff.byId(a.assignedStaffId());
 		return new Detail(a.getId(), a.accountNo(), customers.get(a.customerId()), product.code(), product.name(),
 				a.repaymentMethod().name(), a.origin().name(), a.status().name(), a.initialPrincipal().won(),
 				a.disbursedOn(), a.maturityDate(), a.termMonths(), a.graceMonths(), currentRate,
@@ -378,7 +382,8 @@ class LoanController {
 				prepaymentFee(a, Money.won(a.principalBalance()), today).won(), a.delinquencyDays(),
 				a.delinquentSince(), a.nextDueDate(), a.acceleratedOn(), a.paidOffOn(), a.lastSettledOn(), a.asOf(),
 				today, a.virtualAccountNo(), a.totalPaid(), a.refundPending(), a.assignedStaffId(), limitation,
-				acquisition);
+				acquisition, assignee.map(dev.arche.staff.CurrentStaff::name).orElse(null),
+				assignee.map(dev.arche.staff.CurrentStaff::teamId).map(staff.teamNames()::get).orElse(null));
 	}
 
 	@GetMapping("/{id}/schedule")

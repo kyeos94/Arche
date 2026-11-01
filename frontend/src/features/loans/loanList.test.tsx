@@ -98,7 +98,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('계약 목록 검색 조건 (ADR 0011)', () => {
   it('URL에서 검색 조건을 읽고, 예전 q는 서버가 자동 판단하게 보낸다', () => {
     const s = readSearch(new URLSearchParams('status=DELINQUENT&principalMin=100&size=999&q=L0001'))
-    expect(s).toMatchObject({ status: 'DELINQUENT', principalMin: '100', size: 50, page: 0, q: 'L0001' })
+    expect(s).toMatchObject({ status: 'DELINQUENT', principalMin: '100', size: 20, page: 0, q: 'L0001' })
     expect(s.keyword).toBeUndefined()
     expect(activeCount({ principalMin: '1', principalMax: '2', keyword: 'a', unassigned: 'true' })).toBe(3)
     expect(exportFilter('', { assignedStaffId: '5', keyword: '홍', keywordType: 'NAME' })).toMatchObject({
@@ -110,13 +110,13 @@ describe('계약 목록 검색 조건 (ADR 0011)', () => {
     })
   })
 
-  it('쪽 번호는 처음·끝과 현재 쪽 주변만 보여 준다', () => {
+  it('페이지 번호는 처음·끝과 현재 쪽 주변만 보여 준다', () => {
     expect(pageWindow(0, 3)).toEqual([0, 1, 2])
     expect(pageWindow(10, 30)).toEqual([0, null, 8, 9, 10, 11, 12, null, 29])
     expect(pageWindow(0, 0)).toEqual([])
   })
 
-  it('상세 조건을 적용하면 URL과 요청에 반영되고, 머리글을 누르면 서버 정렬, 쪽 건수를 바꾸면 첫 쪽으로', async () => {
+  it('상세 조건을 적용하면 URL과 요청에 반영되고, 머리글을 누르면 서버 정렬, 페이지 건수를 바꾸면 첫 페이지로', async () => {
     const calls = mockServer()
     render(withProviders(<LoanListPage />, '/loans?page=2'))
     expect(await screen.findByText('L00000001')).toBeInTheDocument()
@@ -144,9 +144,9 @@ describe('계약 목록 검색 조건 (ADR 0011)', () => {
     await userEvent.click(screen.getByRole('button', { name: /원금 잔액/ }))
     expect(loc().get('dir')).toBe('desc')
 
-    await userEvent.click(screen.getByRole('button', { name: '2쪽' }))
+    await userEvent.click(screen.getByRole('button', { name: '2페이지' }))
     expect(loc().get('page')).toBe('1')
-    await userEvent.selectOptions(screen.getByLabelText('한 쪽 건수'), '100')
+    await userEvent.selectOptions(screen.getByLabelText('한 페이지 건수'), '100')
     expect(loc().get('size')).toBe('100')
     expect(loc().get('page')).toBeNull()
   })

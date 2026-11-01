@@ -26,7 +26,7 @@ class LoanQuery {
 			"delinquencyDays", "delinquency_days", "nextDueDate", "next_due_date", "disbursedOn", "disbursed_on",
 			"initialPrincipal", "initial_principal");
 
-	static final List<Integer> PAGE_SIZES = List.of(20, 50, 100, 200);
+	static final List<Integer> PAGE_SIZES = List.of(10, 20, 50, 100, 200);
 
 	record Row(long id, String accountNo, long customerId, String productCode, String status, long initialPrincipal,
 			long principalBalance, long payoffAmount, int delinquencyDays, @Nullable LocalDate nextDueDate,

@@ -100,6 +100,8 @@ export interface LoanDetail {
   totalPaid: number
   refundPending: number
   assignedStaffId: number | null
+  assignedStaffName: string | null
+  assignedStaffTeam: string | null
   limitationCompletionDate: string | null
   acquisition: AcquisitionInfo | null
 }

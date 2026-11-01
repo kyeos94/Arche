@@ -68,6 +68,8 @@ const g27: LoanDetail = {
   assignedStaffId: 3,
   limitationCompletionDate: null,
   acquisition: null,
+  assignedStaffName: null,
+  assignedStaffTeam: null,
 }
 
 describe('SummaryBar', () => {
