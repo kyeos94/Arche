@@ -1,6 +1,7 @@
 package dev.arche.payment.internal;
 
 import dev.arche.calendar.BusinessDates;
+import dev.arche.payment.LegalActionLink;
 import dev.arche.common.BusinessException;
 import dev.arche.common.Money;
 import dev.arche.payment.Payments;
@@ -87,10 +88,11 @@ class PaymentController {
 	private final LoanAccounts accounts;
 	private final BusinessDates businessDates;
 	private final StaffDirectory staff;
+	private final LegalActionLink legalActions;
 
 	PaymentController(PaymentService service, PaymentRepository payments, UnmatchedDepositRepository unmatched,
 			PaymentCorrectionRepository corrections, LoanAccounts accounts, BusinessDates businessDates,
-			StaffDirectory staff) {
+			StaffDirectory staff, LegalActionLink legalActions) {
 		this.service = service;
 		this.payments = payments;
 		this.unmatched = unmatched;
@@ -98,12 +100,23 @@ class PaymentController {
 		this.accounts = accounts;
 		this.businessDates = businessDates;
 		this.staff = staff;
+		this.legalActions = legalActions;
 	}
 
 	@PostMapping("/payments")
 	@PreAuthorize("hasAuthority('payment.register')")
 	Payments.PaymentView register(@Valid @RequestBody RegisterRequest body) {
 		Long accountId = resolve(body.accountId(), body.accountNo(), true);
+		if (body.legalActionId() != null) {
+			// 배당금·공탁금은 그 법조치의 계약에 입금 (R52)
+			long actionAccount = legalActions.accountIdOf(body.legalActionId())
+					.orElseThrow(() -> new BusinessException("LEGAL_ACTION_NOT_FOUND", "법조치가 없습니다"));
+			if (accountId == null) {
+				accountId = actionAccount;
+			} else if (accountId != actionAccount) {
+				throw new BusinessException("LEGAL_ACTION_INVALID", "다른 계약의 법조치입니다");
+			}
+		}
 		LoanAccounts.PrepaymentOption prepay = Boolean.TRUE.equals(body.prepayment())
 				? new LoanAccounts.PrepaymentOption(
 						body.prepaymentPrincipal() == null ? null : Money.won(body.prepaymentPrincipal()))
