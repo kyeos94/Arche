@@ -6,13 +6,23 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatDateTime, formatMoney, formatRate } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { DocumentStatusBadge, ScreeningTable } from './components'
-import { APPLICATION_STATUS_LABEL, CHANNEL_LABEL, LANDING_STATUS_LABEL, VIA_LABEL, formatBytes } from './labels'
+import {
+  APPLICATION_STATUS_LABEL,
+  CHANNEL_LABEL,
+  DOCUMENT_STATUS_LABEL,
+  LANDING_STATUS_LABEL,
+  VIA_LABEL,
+  formatBytes,
+} from './labels'
 
 type Done = () => Promise<void>
+
+const statusLabel = (s: string) => APPLICATION_STATUS_LABEL[s as keyof typeof APPLICATION_STATUS_LABEL] ?? s
 
 export function ScreeningTab({ review, onDone }: { review: Review; onDone: Done }) {
   const id = review.application.id
@@ -27,6 +37,21 @@ export function ScreeningTab({ review, onDone }: { review: Review; onDone: Done 
   })
   const withdraw = useMutation({ mutationFn: (cid: number) => origination.withdrawConsent(id, cid), onSuccess: onDone })
   const inquire = useMutation({ mutationFn: () => origination.inquireCredit(id), onSuccess: onDone })
+  const inquiries = useSort(review.creditInquiries, {
+    date: (c) => c.inquiredOn,
+    grade: (c) => c.grade,
+    delinquent: (c) => c.currentlyDelinquent,
+    loans: (c) => c.openLoanCount,
+    debt: (c) => c.totalDebt,
+    ref: (c) => c.inquiryRef,
+  })
+  const consents = useSort(review.consents, {
+    channel: (c) => CHANNEL_LABEL[c.channel] ?? c.channel,
+    agreedOn: (c) => c.agreedOn,
+    validUntil: (c) => c.validUntil,
+    evidence: (c) => c.evidence,
+    status: (c) => (c.withdrawnAt ? '철회' : c.valid ? '유효' : '만료'),
+  })
   return (
     <div className="space-y-3">
       <Card>
@@ -45,17 +70,21 @@ export function ScreeningTab({ review, onDone }: { review: Review; onDone: Done 
           <Table aria-label="신용조회 결과">
             <THead>
               <TR>
-                <TH>조회일</TH>
-                <TH>등급</TH>
-                <TH>현재 연체</TH>
-                <TH className="text-right">보유 대출</TH>
-                <TH className="text-right">잔액</TH>
-                <TH>조회 번호</TH>
+                <SortTH {...inquiries.header('date')}>조회일</SortTH>
+                <SortTH {...inquiries.header('grade')}>등급</SortTH>
+                <SortTH {...inquiries.header('delinquent')}>현재 연체</SortTH>
+                <SortTH {...inquiries.header('loans')} className="text-right">
+                  보유 대출
+                </SortTH>
+                <SortTH {...inquiries.header('debt')} className="text-right">
+                  잔액
+                </SortTH>
+                <SortTH {...inquiries.header('ref')}>조회 번호</SortTH>
               </TR>
             </THead>
             <TBody>
               {review.creditInquiries.length === 0 && <EmptyRow colSpan={6}>조회 기록이 없습니다</EmptyRow>}
-              {review.creditInquiries.map((c) => (
+              {inquiries.sorted.map((c) => (
                 <TR key={c.id}>
                   <TD>{formatDate(c.inquiredOn)}</TD>
                   <TD>{c.grade}등급</TD>
@@ -83,17 +112,17 @@ export function ScreeningTab({ review, onDone }: { review: Review; onDone: Done 
           <Table aria-label="동의 이력">
             <THead>
               <TR>
-                <TH>채널</TH>
-                <TH>동의일</TH>
-                <TH>유효기간</TH>
-                <TH>증빙</TH>
-                <TH>상태</TH>
+                <SortTH {...consents.header('channel')}>채널</SortTH>
+                <SortTH {...consents.header('agreedOn')}>동의일</SortTH>
+                <SortTH {...consents.header('validUntil')}>유효기간</SortTH>
+                <SortTH {...consents.header('evidence')}>증빙</SortTH>
+                <SortTH {...consents.header('status')}>상태</SortTH>
                 <TH />
               </TR>
             </THead>
             <TBody>
               {review.consents.length === 0 && <EmptyRow colSpan={6}>동의 이력이 없습니다</EmptyRow>}
-              {review.consents.map((c) => (
+              {consents.sorted.map((c) => (
                 <TR key={c.id}>
                   <TD>{CHANNEL_LABEL[c.channel] ?? c.channel}</TD>
                   <TD>{formatDate(c.agreedOn)}</TD>
@@ -211,6 +240,10 @@ function DocumentRow({ appId, doc, editable, onDone }: { appId: number; doc: App
 
 export function DocumentsTab({ review, onDone }: { review: Review; onDone: Done }) {
   const editable = ['RECEIVED', 'PRE_SCREENING', 'ASSIGNED', 'UNDERWRITING'].includes(review.application.status)
+  const { sorted, header } = useSort(review.documents, {
+    label: (d) => d.label,
+    status: (d) => DOCUMENT_STATUS_LABEL[d.status] ?? d.status,
+  })
   return (
     <div className="space-y-2">
       <p className="text-[11px] text-muted-foreground">
@@ -219,8 +252,8 @@ export function DocumentsTab({ review, onDone }: { review: Review; onDone: Done 
       <Table aria-label="서류 징구">
         <THead>
           <TR>
-            <TH>서류</TH>
-            <TH>상태</TH>
+            <SortTH {...header('label')}>서류</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
             <TH>접수</TH>
             <TH>확인·보완</TH>
             <TH />
@@ -228,7 +261,7 @@ export function DocumentsTab({ review, onDone }: { review: Review; onDone: Done 
         </THead>
         <TBody>
           {review.documents.length === 0 && <EmptyRow colSpan={5} />}
-          {review.documents.map((d) => (
+          {sorted.map((d) => (
             <DocumentRow key={d.id} appId={review.application.id} doc={d} editable={editable} onDone={onDone} />
           ))}
         </TBody>
@@ -259,6 +292,29 @@ export function ChannelTab({ app, onDone }: { app: Application; onDone: Done }) 
   })
   const c = q.data
   const open = ['RECEIVED', 'PRE_SCREENING', 'ASSIGNED', 'UNDERWRITING'].includes(app.status)
+  const links = useSort(c?.landingLinks, {
+    created: (l) => l.createdAt,
+    status: (l) => LANDING_STATUS_LABEL[l.status] ?? l.status,
+    expires: (l) => l.expiresAt,
+    failed: (l) => l.failedAttempts,
+    verified: (l) => l.verifiedAt,
+    completed: (l) => l.completedAt,
+  })
+  const commissions = useSort(c?.commissions, {
+    type: (m) => (m.entryType === 'SETTLEMENT' ? '정산' : '환수'),
+    date: (m) => m.occurredOn,
+    base: (m) => m.baseAmount,
+    rate: (m) => m.rate,
+    amount: (m) => m.amount,
+    reason: (m) => m.reason,
+  })
+  const notices = useSort(c?.platformNotices, {
+    result: (n) => statusLabel(n.result),
+    delivered: (n) => n.delivered,
+    attempts: (n) => n.attempts,
+    lastSent: (n) => n.lastSentAt,
+    receipt: (n) => n.receiptId,
+  })
   return (
     <div className="space-y-3">
       <ErrorMessage error={q.error} />
@@ -284,17 +340,17 @@ export function ChannelTab({ app, onDone }: { app: Application; onDone: Done }) 
           <Table aria-label="랜딩 링크">
             <THead>
               <TR>
-                <TH>발급</TH>
-                <TH>상태</TH>
-                <TH>만료</TH>
-                <TH>인증 실패</TH>
-                <TH>본인 확인</TH>
-                <TH>제출 완료</TH>
+                <SortTH {...links.header('created')}>발급</SortTH>
+                <SortTH {...links.header('status')}>상태</SortTH>
+                <SortTH {...links.header('expires')}>만료</SortTH>
+                <SortTH {...links.header('failed')}>인증 실패</SortTH>
+                <SortTH {...links.header('verified')}>본인 확인</SortTH>
+                <SortTH {...links.header('completed')}>제출 완료</SortTH>
               </TR>
             </THead>
             <TBody>
               {c?.landingLinks.length === 0 && <EmptyRow colSpan={6}>발급한 링크가 없습니다</EmptyRow>}
-              {c?.landingLinks.map((l) => (
+              {links.sorted.map((l) => (
                 <TR key={l.id}>
                   <TD>{formatDateTime(l.createdAt)}</TD>
                   <TD>{LANDING_STATUS_LABEL[l.status] ?? l.status}</TD>
@@ -320,17 +376,23 @@ export function ChannelTab({ app, onDone }: { app: Application; onDone: Done }) 
             <Table aria-label="중개수수료">
               <THead>
                 <TR>
-                  <TH>구분</TH>
-                  <TH>일자</TH>
-                  <TH className="text-right">기준 금액</TH>
-                  <TH className="text-right">수수료율</TH>
-                  <TH className="text-right">금액</TH>
-                  <TH>사유</TH>
+                  <SortTH {...commissions.header('type')}>구분</SortTH>
+                  <SortTH {...commissions.header('date')}>일자</SortTH>
+                  <SortTH {...commissions.header('base')} className="text-right">
+                    기준 금액
+                  </SortTH>
+                  <SortTH {...commissions.header('rate')} className="text-right">
+                    수수료율
+                  </SortTH>
+                  <SortTH {...commissions.header('amount')} className="text-right">
+                    금액
+                  </SortTH>
+                  <SortTH {...commissions.header('reason')}>사유</SortTH>
                 </TR>
               </THead>
               <TBody>
                 {c.commissions.length === 0 && <EmptyRow colSpan={6}>실행 시 정산됩니다</EmptyRow>}
-                {c.commissions.map((m) => (
+                {commissions.sorted.map((m) => (
                   <TR key={m.entryType}>
                     <TD>{m.entryType === 'SETTLEMENT' ? '정산' : '환수'}</TD>
                     <TD>{formatDate(m.occurredOn)}</TD>
@@ -379,18 +441,18 @@ export function ChannelTab({ app, onDone }: { app: Application; onDone: Done }) 
             <Table aria-label="결과 통보">
               <THead>
                 <TR>
-                  <TH>결과</TH>
-                  <TH>전달</TH>
-                  <TH>시도</TH>
-                  <TH>마지막 발송</TH>
-                  <TH>수신 번호</TH>
+                  <SortTH {...notices.header('result')}>결과</SortTH>
+                  <SortTH {...notices.header('delivered')}>전달</SortTH>
+                  <SortTH {...notices.header('attempts')}>시도</SortTH>
+                  <SortTH {...notices.header('lastSent')}>마지막 발송</SortTH>
+                  <SortTH {...notices.header('receipt')}>수신 번호</SortTH>
                 </TR>
               </THead>
               <TBody>
                 {c.platformNotices.length === 0 && <EmptyRow colSpan={5}>승인·거절·철회 시 통보됩니다</EmptyRow>}
-                {c.platformNotices.map((n) => (
+                {notices.sorted.map((n) => (
                   <TR key={n.result}>
-                    <TD>{APPLICATION_STATUS_LABEL[n.result as keyof typeof APPLICATION_STATUS_LABEL] ?? n.result}</TD>
+                    <TD>{statusLabel(n.result)}</TD>
                     <TD>{n.delivered ? '전달' : '실패'}</TD>
                     <TD className="num">{n.attempts}</TD>
                     <TD>{formatDateTime(n.lastSentAt)}</TD>
@@ -414,23 +476,30 @@ export function ChannelTab({ app, onDone }: { app: Application; onDone: Done }) 
 
 export function HistoryTab({ id }: { id: number }) {
   const q = useQuery({ queryKey: originationKeys.history(id), queryFn: () => origination.history(id) })
+  const { sorted, header } = useSort(q.data, {
+    changedAt: (h) => h.changedAt,
+    from: (h) => (h.fromStatus ? statusLabel(h.fromStatus) : null),
+    to: (h) => statusLabel(h.toStatus),
+    actor: (h) => h.actor,
+    reason: (h) => h.reason,
+  })
   return (
     <Table aria-label="상태 이력">
       <THead>
         <TR>
-          <TH>시각</TH>
-          <TH>이전</TH>
-          <TH>이후</TH>
-          <TH>처리자</TH>
-          <TH>사유</TH>
+          <SortTH {...header('changedAt')}>시각</SortTH>
+          <SortTH {...header('from')}>이전</SortTH>
+          <SortTH {...header('to')}>이후</SortTH>
+          <SortTH {...header('actor')}>처리자</SortTH>
+          <SortTH {...header('reason')}>사유</SortTH>
         </TR>
       </THead>
       <TBody>
-        {q.data?.map((h, i) => (
+        {sorted.map((h, i) => (
           <TR key={i}>
             <TD>{formatDateTime(h.changedAt)}</TD>
-            <TD>{h.fromStatus ? (APPLICATION_STATUS_LABEL[h.fromStatus as keyof typeof APPLICATION_STATUS_LABEL] ?? h.fromStatus) : '-'}</TD>
-            <TD>{APPLICATION_STATUS_LABEL[h.toStatus as keyof typeof APPLICATION_STATUS_LABEL] ?? h.toStatus}</TD>
+            <TD>{h.fromStatus ? statusLabel(h.fromStatus) : '-'}</TD>
+            <TD>{statusLabel(h.toStatus)}</TD>
             <TD>{h.actor}</TD>
             <TD className="text-muted-foreground">{h.reason ?? ''}</TD>
           </TR>

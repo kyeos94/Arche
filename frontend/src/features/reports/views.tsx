@@ -1,8 +1,9 @@
 import type { DailyReport, JournalReport, Provision, ReportLine, RollRate } from '@/api/reportTypes'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 /** 일보 구역 표시 순서. 모르는 구역(새 항목)은 뒤에 붙인다 */
@@ -206,6 +207,17 @@ export function ProvisionView({ data }: { data: Provision }) {
 const LINE_LIMIT = 500
 
 export function JournalView({ data }: { data: JournalReport }) {
+  // 계정별 합계 표는 계정 순서·합계 행이 고정이라 정렬하지 않는다. 거래별 분개 행만 정렬 (정렬 후 앞 LINE_LIMIT행)
+  const { sorted, header } = useSort(data.lines, {
+    entry: (l) => l.entryId,
+    accountNo: (l) => l.accountNo,
+    posting: (l) => l.postingLabel,
+    account: (l) => l.accountCode,
+    // 빈 칸(0)은 방향과 관계없이 뒤로
+    debit: (l) => l.debit || null,
+    credit: (l) => l.credit || null,
+    memo: (l) => l.memo,
+  })
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -255,17 +267,21 @@ export function JournalView({ data }: { data: JournalReport }) {
         <Table className="mt-2">
           <THead>
             <TR>
-              <TH>원장</TH>
-              <TH>계약번호</TH>
-              <TH>거래유형</TH>
-              <TH>계정</TH>
-              <TH className="text-right">차변</TH>
-              <TH className="text-right">대변</TH>
-              <TH>적요</TH>
+              <SortTH {...header('entry')}>원장</SortTH>
+              <SortTH {...header('accountNo')}>계약번호</SortTH>
+              <SortTH {...header('posting')}>거래유형</SortTH>
+              <SortTH {...header('account')}>계정</SortTH>
+              <SortTH {...header('debit')} className="text-right">
+                차변
+              </SortTH>
+              <SortTH {...header('credit')} className="text-right">
+                대변
+              </SortTH>
+              <SortTH {...header('memo')}>적요</SortTH>
             </TR>
           </THead>
           <TBody>
-            {data.lines.slice(0, LINE_LIMIT).map((l, i) => (
+            {sorted.slice(0, LINE_LIMIT).map((l, i) => (
               <TR key={`${l.entryId}-${i}`} className={cn(l.unmapped && 'text-destructive')}>
                 <TD>#{l.entryId}</TD>
                 <TD>{l.accountNo}</TD>

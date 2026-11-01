@@ -4,15 +4,16 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import type { z } from 'zod'
-import { type Broker, origination, originationKeys } from '@/api/origination'
+import { type Broker, type Commission, origination, originationKeys } from '@/api/origination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { brokerRateSchema, brokerSchema } from './labels'
 
 /** API 키는 발급 직후 한 번만 보여준다 (서버는 해시만 보관) */
@@ -76,6 +77,10 @@ function RegisterBrokerDialog() {
   )
 }
 
+function commissionTypeLabel(c: Commission) {
+  return c.entryType === 'SETTLEMENT' ? '정산' : c.reasonCode === 'EARLY_PAYOFF' ? '환수(조기 완제)' : '환수(불완전판매)'
+}
+
 type RateInput = z.input<typeof brokerRateSchema>
 type RateOutput = z.output<typeof brokerRateSchema>
 
@@ -108,6 +113,22 @@ function BrokerDetail({ broker }: { broker: Broker }) {
   const rotate = useMutation({ mutationFn: () => origination.rotateBrokerKey(broker.id), onSuccess: (r) => setKey(r.apiKey) })
   const d = q.data
   const re = rateForm.formState.errors
+  const rates = useSort(d?.rates, {
+    rate: (r) => r.rate,
+    from: (r) => r.validFrom,
+    // 종료일이 없으면 현재 적용 중 = 가장 늦은 날로 본다
+    to: (r) => r.validTo ?? '9999-12-31',
+    reason: (r) => r.reason,
+  })
+  const commissions = useSort(d?.commissions, {
+    date: (c) => c.occurredOn,
+    application: (c) => c.applicationNo,
+    type: commissionTypeLabel,
+    base: (c) => c.baseAmount,
+    rate: (c) => c.rate,
+    amount: (c) => c.amount,
+    reason: (c) => c.reason,
+  })
   return (
     <Card>
       <CardHeader>
@@ -134,14 +155,16 @@ function BrokerDetail({ broker }: { broker: Broker }) {
           <Table aria-label="수수료율 이력">
             <THead>
               <TR>
-                <TH className="text-right">수수료율</TH>
-                <TH>시작일</TH>
-                <TH>종료일</TH>
-                <TH>사유</TH>
+                <SortTH {...rates.header('rate')} className="text-right">
+                  수수료율
+                </SortTH>
+                <SortTH {...rates.header('from')}>시작일</SortTH>
+                <SortTH {...rates.header('to')}>종료일</SortTH>
+                <SortTH {...rates.header('reason')}>사유</SortTH>
               </TR>
             </THead>
             <TBody>
-              {d?.rates.map((r) => (
+              {rates.sorted.map((r) => (
                 <TR key={r.id}>
                   <TD className="num">{formatRate(r.rate)}</TD>
                   <TD>{formatDate(r.validFrom)}</TD>
@@ -179,18 +202,24 @@ function BrokerDetail({ broker }: { broker: Broker }) {
           <Table aria-label="정산·환수">
             <THead>
               <TR>
-                <TH>일자</TH>
-                <TH>신청</TH>
-                <TH>구분</TH>
-                <TH className="text-right">실행금액</TH>
-                <TH className="text-right">수수료율</TH>
-                <TH className="text-right">금액</TH>
-                <TH>사유</TH>
+                <SortTH {...commissions.header('date')}>일자</SortTH>
+                <SortTH {...commissions.header('application')}>신청</SortTH>
+                <SortTH {...commissions.header('type')}>구분</SortTH>
+                <SortTH {...commissions.header('base')} className="text-right">
+                  실행금액
+                </SortTH>
+                <SortTH {...commissions.header('rate')} className="text-right">
+                  수수료율
+                </SortTH>
+                <SortTH {...commissions.header('amount')} className="text-right">
+                  금액
+                </SortTH>
+                <SortTH {...commissions.header('reason')}>사유</SortTH>
               </TR>
             </THead>
             <TBody>
               {d?.commissions.length === 0 && <EmptyRow colSpan={7} />}
-              {d?.commissions.map((c) => (
+              {commissions.sorted.map((c) => (
                 <TR key={c.id}>
                   <TD>{formatDate(c.occurredOn)}</TD>
                   <TD>
@@ -198,7 +227,7 @@ function BrokerDetail({ broker }: { broker: Broker }) {
                       {c.applicationNo}
                     </Link>
                   </TD>
-                  <TD>{c.entryType === 'SETTLEMENT' ? '정산' : c.reasonCode === 'EARLY_PAYOFF' ? '환수(조기 완제)' : '환수(불완전판매)'}</TD>
+                  <TD>{commissionTypeLabel(c)}</TD>
                   <TD className="num">{formatMoney(c.baseAmount)}</TD>
                   <TD className="num">{formatRate(c.rate)}</TD>
                   <TD className="num">{formatMoney(c.amount)}</TD>
@@ -224,6 +253,14 @@ export function BrokersPage() {
     onSuccess: () => client.invalidateQueries({ queryKey: originationKeys.brokers }),
   })
   const broker = q.data?.find((b) => b.id === selected)
+  const { sorted, header } = useSort(q.data, {
+    no: (b) => b.brokerNo,
+    name: (b) => b.name,
+    registrationNo: (b) => b.registrationNo,
+    rate: (b) => b.currentRate,
+    ips: (b) => b.allowedIps,
+    status: (b) => (b.status === 'ACTIVE' ? '거래 중' : '정지'),
+  })
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -245,18 +282,20 @@ export function BrokersPage() {
       <Table>
         <THead>
           <TR>
-            <TH>번호</TH>
-            <TH>이름</TH>
-            <TH>등록 번호</TH>
-            <TH className="text-right">현재 수수료율</TH>
-            <TH>허용 IP</TH>
-            <TH>상태</TH>
+            <SortTH {...header('no')}>번호</SortTH>
+            <SortTH {...header('name')}>이름</SortTH>
+            <SortTH {...header('registrationNo')}>등록 번호</SortTH>
+            <SortTH {...header('rate')} className="text-right">
+              현재 수수료율
+            </SortTH>
+            <SortTH {...header('ips')}>허용 IP</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
             <TH />
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {q.data?.map((b) => (
+          {sorted.map((b) => (
             <TR key={b.id}>
               <TD>{b.brokerNo}</TD>
               <TD>{b.name}</TD>

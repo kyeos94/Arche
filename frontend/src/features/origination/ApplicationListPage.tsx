@@ -12,10 +12,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDateTime, formatMoney } from '@/lib/format'
 import { customerSchema, DUE_DAYS } from '@/lib/schemas'
+import { useSort } from '@/lib/useSort'
 import { ApplicationStatusBadge } from './components'
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABEL, CHANNEL_LABEL, REJECT_REASON_LABEL, receiveSchema } from './labels'
 
@@ -153,6 +154,17 @@ export function ApplicationListPage() {
   const { can } = useAuth()
   const [status, setStatus] = useState('')
   const q = useQuery({ queryKey: originationKeys.applications(status), queryFn: () => origination.applications(status) })
+  const { sorted, header } = useSort(q.data, {
+    no: (a) => a.applicationNo,
+    received: (a) => a.receivedAt,
+    customer: (a) => a.customerName,
+    product: (a) => a.productCode,
+    amount: (a) => a.requestedAmount,
+    channel: (a) => CHANNEL_LABEL[a.channel] ?? a.channel,
+    status: (a) => APPLICATION_STATUS_LABEL[a.status] ?? a.status,
+    underwriter: (a) => a.underwriterName,
+    reject: (a) => (a.rejectReasonCode ? (REJECT_REASON_LABEL[a.rejectReasonCode] ?? a.rejectReasonCode) : null),
+  })
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -184,20 +196,22 @@ export function ApplicationListPage() {
       <Table>
         <THead>
           <TR>
-            <TH>신청번호</TH>
-            <TH>접수</TH>
-            <TH>고객</TH>
-            <TH>상품</TH>
-            <TH className="text-right">신청액</TH>
-            <TH>채널</TH>
-            <TH>상태</TH>
-            <TH>심사자</TH>
-            <TH>거절 사유</TH>
+            <SortTH {...header('no')}>신청번호</SortTH>
+            <SortTH {...header('received')}>접수</SortTH>
+            <SortTH {...header('customer')}>고객</SortTH>
+            <SortTH {...header('product')}>상품</SortTH>
+            <SortTH {...header('amount')} className="text-right">
+              신청액
+            </SortTH>
+            <SortTH {...header('channel')}>채널</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
+            <SortTH {...header('underwriter')}>심사자</SortTH>
+            <SortTH {...header('reject')}>거절 사유</SortTH>
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={9} />}
-          {q.data?.map((a) => (
+          {sorted.map((a) => (
             <TR key={a.id}>
               <TD>
                 <Link className="text-primary underline-offset-2 hover:underline" to={`/applications/${a.id}`}>

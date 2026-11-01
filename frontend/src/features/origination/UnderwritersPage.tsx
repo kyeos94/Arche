@@ -5,9 +5,10 @@ import { type Underwriter, origination, originationKeys } from '@/api/originatio
 import { ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDateTime } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 function ProfileEditor({ u, codes }: { u: Underwriter; codes: string[] }) {
   const client = useQueryClient()
@@ -47,6 +48,14 @@ export function UnderwritersPage() {
   const products = useQuery({ queryKey: queryKeys.products, queryFn: endpoints.products })
   const codes = products.data?.map((p) => p.code).filter((c) => c !== 'N1') ?? []
   const editable = can('application.assign')
+  const { sorted, header } = useSort(q.data?.underwriters, {
+    name: (u) => u.name,
+    role: (u) => (u.role === 'UNDERWRITER' ? '심사역' : '심사팀장'),
+    pending: (u) => u.pending,
+    lastAssigned: (u) => u.lastAssignedAt,
+    products: (u) => (u.allProducts ? '전 상품' : u.productCodes.join(', ') || '없음'),
+    status: (u) => (u.available ? '배정 가능' : '부재'),
+  })
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">심사자 배정</h1>
@@ -63,18 +72,20 @@ export function UnderwritersPage() {
       <Table>
         <THead>
           <TR>
-            <TH>이름</TH>
-            <TH>역할</TH>
-            <TH className="text-right">미처리</TH>
-            <TH>마지막 배정</TH>
-            <TH>담당 상품</TH>
-            <TH>상태</TH>
+            <SortTH {...header('name')}>이름</SortTH>
+            <SortTH {...header('role')}>역할</SortTH>
+            <SortTH {...header('pending')} className="text-right">
+              미처리
+            </SortTH>
+            <SortTH {...header('lastAssigned')}>마지막 배정</SortTH>
+            <SortTH {...header('products')}>담당 상품</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
             {editable && <TH>프로필</TH>}
           </TR>
         </THead>
         <TBody>
           {q.data?.underwriters.length === 0 && <EmptyRow colSpan={editable ? 7 : 6} />}
-          {q.data?.underwriters.map((u) => (
+          {sorted.map((u) => (
             <TR key={u.staffId}>
               <TD>
                 {u.name} <span className="text-muted-foreground">({u.loginId})</span>

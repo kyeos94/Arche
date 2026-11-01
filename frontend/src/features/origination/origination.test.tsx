@@ -145,6 +145,8 @@ describe('DocumentsTab (R54)', () => {
 
   it('승인 후에는 서류를 바꿀 수 없다', () => {
     render(wrap(<DocumentsTab review={review('APPROVED')} onDone={async () => {}} />))
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    // 머리글의 정렬 버튼은 빼고 서류 행의 처리 버튼만 센다
+    const body = screen.getAllByRole('rowgroup')[1]
+    expect(within(body).queryAllByRole('button')).toHaveLength(0)
   })
 })

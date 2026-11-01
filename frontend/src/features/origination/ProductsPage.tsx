@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { origination, originationKeys } from '@/api/origination'
 import { ErrorMessage } from '@/components/ui/alert'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatMoney, formatRate } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 const METHOD_LABEL: Record<string, string> = {
   EQUAL_INSTALLMENT: '원리금균등',
@@ -14,10 +15,19 @@ const METHOD_LABEL: Record<string, string> = {
   ACQUIRED: '매입채권',
 }
 
+type ProductExtra = { productVersion?: number; collateralType?: string; prepaymentFeeRate?: number }
+
 /** 상품 조회 (정책서 1장) + 상품별 징구 서류 (R54). 변경은 새 버전으로만 (화면에서는 조회만) */
 export function ProductsPage() {
   const products = useQuery({ queryKey: queryKeys.products, queryFn: endpoints.products })
   const reqs = useQuery({ queryKey: originationKeys.requirements, queryFn: origination.requirements })
+  const { sorted, header } = useSort(products.data, {
+    code: (p) => p.code,
+    name: (p) => p.name,
+    version: (p) => (p as typeof p & ProductExtra).productVersion ?? 1,
+    rate: (p) => p.defaultRate,
+    method: (p) => METHOD_LABEL[p.repaymentMethod] ?? p.repaymentMethod,
+  })
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">상품</h1>
@@ -29,20 +39,22 @@ export function ProductsPage() {
       <Table>
         <THead>
           <TR>
-            <TH>코드</TH>
-            <TH>상품명</TH>
-            <TH>버전</TH>
-            <TH className="text-right">기본 금리</TH>
+            <SortTH {...header('code')}>코드</SortTH>
+            <SortTH {...header('name')}>상품명</SortTH>
+            <SortTH {...header('version')}>버전</SortTH>
+            <SortTH {...header('rate')} className="text-right">
+              기본 금리
+            </SortTH>
             <TH className="text-right">한도</TH>
             <TH>기간</TH>
-            <TH>상환방식</TH>
+            <SortTH {...header('method')}>상환방식</SortTH>
             <TH>징구 서류 (* 필수)</TH>
           </TR>
         </THead>
         <TBody>
           {products.data?.length === 0 && <EmptyRow colSpan={8} />}
-          {products.data?.map((p) => {
-            const extra = p as typeof p & { productVersion?: number; collateralType?: string; prepaymentFeeRate?: number }
+          {sorted.map((p) => {
+            const extra = p as typeof p & ProductExtra
             const docs = reqs.data?.filter((r) => r.productCode === p.code) ?? []
             return (
               <TR key={p.id}>
