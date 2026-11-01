@@ -7,6 +7,7 @@ import type { z } from 'zod'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { origination, originationKeys } from '@/api/origination'
 import type { CustomerView } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +17,7 @@ import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/t
 import { useAuth } from '@/features/auth/auth'
 import { formatDateTime, formatMoney } from '@/lib/format'
 import { customerSchema, DUE_DAYS } from '@/lib/schemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { ApplicationStatusBadge } from './components'
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABEL, CHANNEL_LABEL, REJECT_REASON_LABEL, receiveSchema } from './labels'
@@ -165,6 +167,7 @@ export function ApplicationListPage() {
     underwriter: (a) => a.underwriterName,
     reject: (a) => (a.rejectReasonCode ? (REJECT_REASON_LABEL[a.rejectReasonCode] ?? a.rejectReasonCode) : null),
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -193,50 +196,52 @@ export function ApplicationListPage() {
         </CardContent>
       </Card>
       <ErrorMessage error={q.error} />
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('no')}>신청번호</SortTH>
-            <SortTH {...header('received')}>접수</SortTH>
-            <SortTH {...header('customer')}>고객</SortTH>
-            <SortTH {...header('product')}>상품</SortTH>
-            <SortTH {...header('amount')} className="text-right">
-              신청액
-            </SortTH>
-            <SortTH {...header('channel')}>채널</SortTH>
-            <SortTH {...header('status')}>상태</SortTH>
-            <SortTH {...header('underwriter')}>심사자</SortTH>
-            <SortTH {...header('reject')}>거절 사유</SortTH>
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.length === 0 && <EmptyRow colSpan={9} />}
-          {sorted.map((a) => (
-            <TR key={a.id}>
-              <TD>
-                <Link className="text-primary underline-offset-2 hover:underline" to={`/applications/${a.id}`}>
-                  {a.applicationNo}
-                </Link>
-              </TD>
-              <TD>{formatDateTime(a.receivedAt)}</TD>
-              <TD>{a.customerName}</TD>
-              <TD>{a.productCode}</TD>
-              <TD className="num">{formatMoney(a.requestedAmount)}</TD>
-              <TD>
-                {CHANNEL_LABEL[a.channel] ?? a.channel}
-                {a.intakeSource && <span className="text-muted-foreground"> · {a.intakeSource}</span>}
-              </TD>
-              <TD>
-                <ApplicationStatusBadge status={a.status} />
-              </TD>
-              <TD>{a.underwriterName ?? '-'}</TD>
-              <TD className="text-muted-foreground">
-                {a.rejectReasonCode ? (REJECT_REASON_LABEL[a.rejectReasonCode] ?? a.rejectReasonCode) : ''}
-              </TD>
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('no')}>신청번호</SortTH>
+              <SortTH {...header('received')}>접수</SortTH>
+              <SortTH {...header('customer')}>고객</SortTH>
+              <SortTH {...header('product')}>상품</SortTH>
+              <SortTH {...header('amount')} className="text-right">
+                신청액
+              </SortTH>
+              <SortTH {...header('channel')}>채널</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <SortTH {...header('underwriter')}>심사자</SortTH>
+              <SortTH {...header('reject')}>거절 사유</SortTH>
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.length === 0 && <EmptyRow colSpan={9} />}
+            {paging.rows.map((a) => (
+              <TR key={a.id}>
+                <TD>
+                  <Link className="text-primary underline-offset-2 hover:underline" to={`/applications/${a.id}`}>
+                    {a.applicationNo}
+                  </Link>
+                </TD>
+                <TD>{formatDateTime(a.receivedAt)}</TD>
+                <TD>{a.customerName}</TD>
+                <TD>{a.productCode}</TD>
+                <TD className="num">{formatMoney(a.requestedAmount)}</TD>
+                <TD>
+                  {CHANNEL_LABEL[a.channel] ?? a.channel}
+                  {a.intakeSource && <span className="text-muted-foreground"> · {a.intakeSource}</span>}
+                </TD>
+                <TD>
+                  <ApplicationStatusBadge status={a.status} />
+                </TD>
+                <TD>{a.underwriterName ?? '-'}</TD>
+                <TD className="text-muted-foreground">
+                  {a.rejectReasonCode ? (REJECT_REASON_LABEL[a.rejectReasonCode] ?? a.rejectReasonCode) : ''}
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

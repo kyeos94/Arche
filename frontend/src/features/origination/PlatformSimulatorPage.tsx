@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { type LimitInquiryResult, origination } from '@/api/origination'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import { Field, Input, Select } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime, formatMoney, formatRate } from '@/lib/format'
 import { DUE_DAYS, money, residentNo } from '@/lib/schemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 const schema = z.object({
@@ -87,6 +89,7 @@ export function PlatformSimulatorPage() {
     approved: (n) => n.notice.approvedAmount,
     delivered: (n) => n.delivered,
   })
+  const paging = usePaging(sorted)
   const e = form.formState.errors
   return (
     <div className="space-y-3">
@@ -192,33 +195,35 @@ export function PlatformSimulatorPage() {
             새로고침
           </Button>
           <ErrorMessage error={notices.error} />
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('received')}>수신</SortTH>
-                <SortTH {...header('platformRef')}>플랫폼 번호</SortTH>
-                <SortTH {...header('applicationNo')}>신청번호</SortTH>
-                <SortTH {...header('result')}>결과</SortTH>
-                <SortTH {...header('approved')} className="text-right">
-                  승인액
-                </SortTH>
-                <SortTH {...header('delivered')}>전달</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {notices.data?.length === 0 && <EmptyRow colSpan={6} />}
-              {sorted.map((n, i) => (
-                <TR key={i}>
-                  <TD>{formatDateTime(n.receivedAt)}</TD>
-                  <TD>{n.notice.platformRef}</TD>
-                  <TD>{n.notice.applicationNo}</TD>
-                  <TD>{n.notice.result}</TD>
-                  <TD className="num">{formatMoney(n.notice.approvedAmount)}</TD>
-                  <TD>{n.delivered ? '전달' : '실패(흉내)'}</TD>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('received')}>수신</SortTH>
+                  <SortTH {...header('platformRef')}>플랫폼 번호</SortTH>
+                  <SortTH {...header('applicationNo')}>신청번호</SortTH>
+                  <SortTH {...header('result')}>결과</SortTH>
+                  <SortTH {...header('approved')} className="text-right">
+                    승인액
+                  </SortTH>
+                  <SortTH {...header('delivered')}>전달</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {notices.data?.length === 0 && <EmptyRow colSpan={6} />}
+                {paging.rows.map((n, i) => (
+                  <TR key={i}>
+                    <TD>{formatDateTime(n.receivedAt)}</TD>
+                    <TD>{n.notice.platformRef}</TD>
+                    <TD>{n.notice.applicationNo}</TD>
+                    <TD>{n.notice.result}</TD>
+                    <TD className="num">{formatMoney(n.notice.approvedAmount)}</TD>
+                    <TD>{n.delivered ? '전달' : '실패(흉내)'}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
     </div>
