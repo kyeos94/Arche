@@ -87,7 +87,7 @@ class ExportController {
 		LoanFilter filter = request.effective();
 		// 검색어 원문은 주민등록번호일 수 있어 남기지 않는다 (LoanFilter.toString도 검색어를 빼고 쓴다)
 		String target = "status=" + (filter.status() == null || filter.status().isBlank() ? "ALL" : filter.status())
-				+ (filter.keyword() == null || filter.keyword().isBlank() ? "" : ",keyword");
+				+ (filter.keyword() == null || filter.keyword().isBlank() ? "" : ",q");
 		accessLog.log(ACTION, "LOAN_LIST", target.length() > 50 ? target.substring(0, 50) : target,
 				request.reason().trim());
 		start(response, "loans-" + businessDates.today() + ".xlsx");
