@@ -55,7 +55,14 @@ public record LoanTerms(
 	/** 날짜 d의 약정이율 (N1은 적용이율, 이자 중단이면 0) */
 	public InterestRate rateAt(LocalDate d) {
 		if (acquisition != null) {
-			return acquisition.interestCharged() ? acquisition.appliedRate() : InterestRate.ZERO;
+			// 양수일 뒤의 금리 이력(R46 공적 채무조정 등)만 적용이율을 바꾼다
+			InterestRate rate = acquisition.interestCharged() ? acquisition.appliedRate() : InterestRate.ZERO;
+			for (RatePeriod p : ratePeriods) {
+				if (p.validFrom().isAfter(acquisition.acquiredOn()) && !p.validFrom().isAfter(d)) {
+					rate = p.rate();
+				}
+			}
+			return rate;
 		}
 		InterestRate rate = ratePeriods.getFirst().rate();
 		for (RatePeriod p : ratePeriods) {
