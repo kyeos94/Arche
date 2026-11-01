@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Can } from '@/features/auth/auth'
 import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { CollateralTab } from '@/features/collateral/CollateralTab'
+import { TimelinePanel } from '@/features/communication/TimelinePanel'
 import { CollectionTab } from './CollectionTab'
 import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
@@ -107,22 +109,30 @@ export function LoanDetailPage() {
         </div>
       </div>
       <SummaryBar loan={loan} />
-      <Terms loan={loan} />
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="schedule">상환스케줄</TabsTrigger>
-          <TabsTrigger value="ledger">거래원장</TabsTrigger>
-          <TabsTrigger value="payments">입금내역</TabsTrigger>
-          <TabsTrigger value="history">조건변경이력</TabsTrigger>
-          <TabsTrigger value="collection">추심</TabsTrigger>
-        </TabsList>
-        {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
-        <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
-        <TabsContent value="ledger">{tab === 'ledger' && <LedgerTab loanId={id} />}</TabsContent>
-        <TabsContent value="payments">{tab === 'payments' && <PaymentsTab loanId={id} />}</TabsContent>
-        <TabsContent value="history">{tab === 'history' && <HistoryTab loanId={id} />}</TabsContent>
-        <TabsContent value="collection">{tab === 'collection' && <CollectionTab loan={loan} />}</TabsContent>
-      </Tabs>
+      {/* 3단 구성 (guide 13.2): 요약 바 / 중앙 탭 / 우측 연락 타임라인 */}
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-3">
+          <Terms loan={loan} />
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="schedule">상환스케줄</TabsTrigger>
+              <TabsTrigger value="ledger">거래원장</TabsTrigger>
+              <TabsTrigger value="payments">입금내역</TabsTrigger>
+              <TabsTrigger value="history">조건변경이력</TabsTrigger>
+              <TabsTrigger value="collection">추심</TabsTrigger>
+              <TabsTrigger value="collateral">담보·보증인</TabsTrigger>
+            </TabsList>
+            {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
+            <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
+            <TabsContent value="ledger">{tab === 'ledger' && <LedgerTab loanId={id} />}</TabsContent>
+            <TabsContent value="payments">{tab === 'payments' && <PaymentsTab loanId={id} />}</TabsContent>
+            <TabsContent value="history">{tab === 'history' && <HistoryTab loanId={id} />}</TabsContent>
+            <TabsContent value="collection">{tab === 'collection' && <CollectionTab loan={loan} />}</TabsContent>
+            <TabsContent value="collateral">{tab === 'collateral' && <CollateralTab loan={loan} />}</TabsContent>
+          </Tabs>
+        </div>
+        <TimelinePanel loanId={id} />
+      </div>
     </div>
   )
 }
