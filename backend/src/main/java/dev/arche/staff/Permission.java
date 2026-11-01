@@ -51,7 +51,9 @@ public enum Permission {
 	/** 소멸시효 중단 사유(지급명령·압류·판결 확정) 기록 (R37) */
 	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD),
 	/** 심사자 수동 배정·재배정, 심사자 프로필(담당 상품·부재) 관리 (R55) */
-	APPLICATION_ASSIGN("application.assign", UNDERWRITING_LEAD, HEAD);
+	APPLICATION_ASSIGN("application.assign", UNDERWRITING_LEAD, HEAD),
+	/** 중개업자 등록·API 키·수수료율 관리, 불완전판매 환수·환수 점검 (R56) */
+	BROKER_MANAGE("broker.manage", UNDERWRITING_LEAD, HEAD);
 
 	private final String code;
 	private final Set<Role> roles;

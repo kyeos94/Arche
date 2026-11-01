@@ -40,6 +40,7 @@ class LoanApplication extends BaseEntity {
 	private OffsetDateTime assignedAt;
 	private LocalDate decidedOn;
 	private String rejectReasonCode;
+	private Long brokerId;
 
 	protected LoanApplication() {
 	}
@@ -56,6 +57,7 @@ class LoanApplication extends BaseEntity {
 		this.channel = c.channel();
 		this.intakeSource = c.intakeSource();
 		this.externalRef = c.externalRef();
+		this.brokerId = c.brokerId();
 	}
 
 	ApplicationStatus moveTo(ApplicationStatus next) {
@@ -173,5 +175,9 @@ class LoanApplication extends BaseEntity {
 
 	String rejectReasonCode() {
 		return rejectReasonCode;
+	}
+
+	Long brokerId() {
+		return brokerId;
 	}
 }

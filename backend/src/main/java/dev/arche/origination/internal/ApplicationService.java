@@ -6,6 +6,7 @@ import dev.arche.common.InterestRate;
 import dev.arche.common.Money;
 import dev.arche.common.jpa.NumberGenerator;
 import dev.arche.customer.Customers;
+import dev.arche.origination.ApplicationDecided;
 import dev.arche.origination.ApplicationStatus;
 import dev.arche.origination.LoanDisbursed;
 import dev.arche.product.ProductCatalog;
@@ -37,6 +38,8 @@ interface LoanApplicationRepository extends JpaRepository<LoanApplication, Long>
 	List<LoanApplication> findByCustomerId(long customerId);
 
 	Optional<LoanApplication> findByIntakeSourceAndExternalRef(String intakeSource, String externalRef);
+
+	Optional<LoanApplication> findByApplicationNo(String applicationNo);
 }
 
 interface ApplicationStatusHistoryRepository extends JpaRepository<ApplicationStatusHistory, Long> {
@@ -62,6 +65,7 @@ class ApplicationService {
 	private final ScreeningService screening;
 	private final DocumentService documents;
 	private final AssignmentService assignment;
+	private final BrokerService brokers;
 	private final ProductCatalog products;
 	private final Customers customers;
 	private final StaffDirectory staff;
@@ -72,13 +76,14 @@ class ApplicationService {
 
 	ApplicationService(LoanApplicationRepository applications, ApplicationStatusHistoryRepository history,
 			ScreeningService screening, DocumentService documents, AssignmentService assignment,
-			ProductCatalog products, Customers customers, StaffDirectory staff, BusinessDates businessDates,
-			NumberGenerator numbers, ApplicationEventPublisher events, Clock clock) {
+			BrokerService brokers, ProductCatalog products, Customers customers, StaffDirectory staff,
+			BusinessDates businessDates, NumberGenerator numbers, ApplicationEventPublisher events, Clock clock) {
 		this.applications = applications;
 		this.history = history;
 		this.screening = screening;
 		this.documents = documents;
 		this.assignment = assignment;
+		this.brokers = brokers;
 		this.products = products;
 		this.customers = customers;
 		this.staff = staff;
@@ -170,6 +175,9 @@ class ApplicationService {
 					businessDates.today());
 		}
 		record(a, from, next, reason);
+		if (next == ApplicationStatus.REJECTED || next == ApplicationStatus.WITHDRAWN) {
+			decided(a);
+		}
 		return a;
 	}
 
@@ -188,6 +196,7 @@ class ApplicationService {
 		a.rejected(rejected.getFirst().rule().name(), businessDates.today());
 		record(a, ApplicationStatus.PRE_SCREENING, ApplicationStatus.REJECTED, "자동 거절: "
 				+ rejected.stream().map(r -> r.rule().label).collect(Collectors.joining(", ")));
+		decided(a);
 		return true;
 	}
 
@@ -228,6 +237,7 @@ class ApplicationService {
 		ApplicationStatus from = a.moveTo(ApplicationStatus.APPROVED);
 		a.approve(amount, rate, businessDates.today());
 		record(a, from, ApplicationStatus.APPROVED, "승인 " + amount + "원, " + rate + "%");
+		decided(a);
 		return a;
 	}
 
@@ -238,6 +248,7 @@ class ApplicationService {
 		ApplicationStatus from = a.moveTo(ApplicationStatus.DISBURSED);
 		a.disbursed(today);
 		record(a, from, ApplicationStatus.DISBURSED, "실행 (송금 확인)");
+		brokers.settle(a, today);
 		events.publishEvent(new LoanDisbursed(a.getId(), a.applicationNo(), a.customerId(), a.productCode(),
 				a.approvedAmount(), a.approvedRate(), a.termMonths(), a.graceMonths(), a.dueDay(), today));
 		return a;
@@ -250,6 +261,11 @@ class ApplicationService {
 	LoanApplication find(long id) {
 		return applications.findById(id)
 				.orElseThrow(() -> new BusinessException("APPLICATION_NOT_FOUND", "신청이 없습니다"));
+	}
+
+	/** 결과 확정 이벤트 (플랫폼 결과 통보 등). 커밋 후 비동기로 전달된다 */
+	private void decided(LoanApplication a) {
+		events.publishEvent(new ApplicationDecided(a.getId(), a.applicationNo(), a.status().name()));
 	}
 
 	private void requireAssignPermission() {

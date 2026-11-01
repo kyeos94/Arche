@@ -40,3 +40,48 @@ interface ApplicationDocumentRepository extends JpaRepository<ApplicationDocumen
 
 interface UnderwriterProfileRepository extends JpaRepository<UnderwriterProfile, Long> {
 }
+
+interface BrokerRepository extends JpaRepository<Broker, Long> {
+
+	Optional<Broker> findByApiKeyHash(String apiKeyHash);
+
+	List<Broker> findAllByOrderById();
+}
+
+interface BrokerCommissionRateRepository extends JpaRepository<BrokerCommissionRate, Long> {
+
+	List<BrokerCommissionRate> findByBrokerIdOrderByValidFrom(long brokerId);
+}
+
+interface BrokerCommissionRepository extends JpaRepository<BrokerCommission, Long> {
+
+	List<BrokerCommission> findByBrokerIdOrderByIdDesc(long brokerId);
+
+	List<BrokerCommission> findAllByOrderByIdDesc();
+
+	List<BrokerCommission> findByApplicationIdOrderById(long applicationId);
+
+	List<BrokerCommission> findByEntryTypeAndOccurredOnGreaterThanEqual(BrokerCommission.EntryType type,
+			java.time.LocalDate from);
+}
+
+interface PlatformInquiryRepository extends JpaRepository<PlatformInquiry, Long> {
+
+	Optional<PlatformInquiry> findByPlatformCodeAndPlatformRef(String platformCode, String platformRef);
+
+	Optional<PlatformInquiry> findByApplicationId(long applicationId);
+}
+
+interface PlatformResultNoticeRepository extends JpaRepository<PlatformResultNotice, Long> {
+
+	Optional<PlatformResultNotice> findByApplicationIdAndResult(long applicationId, String result);
+
+	List<PlatformResultNotice> findByApplicationIdOrderById(long applicationId);
+}
+
+interface IdentityVerificationRepository extends JpaRepository<IdentityVerification, Long> {
+
+	Optional<IdentityVerification> findByTokenHash(String tokenHash);
+
+	List<IdentityVerification> findByApplicationIdOrderByIdDesc(long applicationId);
+}
