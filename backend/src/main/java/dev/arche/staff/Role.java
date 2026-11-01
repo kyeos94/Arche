@@ -8,7 +8,12 @@ public enum Role {
 	COLLECTION_LEAD("채권팀장"),
 	TELLER("출납"),
 	HEAD("본부장"),
-	SYSTEM_ADMIN("시스템관리자");
+	SYSTEM_ADMIN("시스템관리자"),
+	/**
+	 * 데모 전용: 모든 메뉴·권한, 전체 데이터 범위. 정책서 9.1 역할이 아니며 데모 모드에서만 만들어지고 로그인할 수 있다.
+	 * 작성자 ≠ 승인자 검사는 그대로 적용된다
+	 */
+	DEMO_ALL("데모(전체 메뉴)");
 
 	private final String label;
 

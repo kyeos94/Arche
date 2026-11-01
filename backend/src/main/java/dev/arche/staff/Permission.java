@@ -64,7 +64,7 @@ public enum Permission {
 	}
 
 	public boolean grantedTo(Role role) {
-		return roles.contains(role);
+		return role == Role.DEMO_ALL || roles.contains(role);
 	}
 
 	public static Set<Permission> of(Role role) {

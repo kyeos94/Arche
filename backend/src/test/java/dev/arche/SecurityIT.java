@@ -50,6 +50,15 @@ class SecurityIT extends IntegrationTest {
 	}
 
 	@Test
+	void 데모_모드가_꺼져_있으면_데모_전용_계정은_로그인할_수_없다() throws Exception {
+		String loginId = newStaff("DEMO_ALL", 9, false);
+		int status = mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("loginId", loginId, "password", PASSWORD)))).andReturn()
+				.getResponse().getStatus();
+		assertThat(status).isEqualTo(401);
+	}
+
+	@Test
 	void 초기_비밀번호는_변경하기_전까지_업무_API를_쓸_수_없다() throws Exception {
 		String loginId = newStaff("TELLER", 4, true);
 		MockHttpSession s = loginAs(loginId);

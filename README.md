@@ -52,6 +52,9 @@ cd frontend && ARCHE_WEB_PORT=5174 ARCHE_API_URL=http://localhost:8081 npm run d
 | `uwlead` | 심사팀장 | `teller` | 출납 |
 | `col1` | 채권담당 (2팀) | `head` | 본부장 |
 | `col2` | 채권담당 (3팀) | `admin` | 시스템관리자 |
+| `demo` | **데모 전용: 모든 메뉴** | | |
+
+`demo`는 정책서 역할이 아닌 데모 전용 계정입니다(`DEMO_ALL`). 데모 모드에서만 만들어지고, 데모 모드를 끄면 로그인할 수 없습니다. 작성자 ≠ 승인자 검사는 그대로라 `demo`가 요청한 마감 후 정정은 다른 계정(`collead`)이 승인해야 합니다.
 
 | 계약 | 내용 | 화면에서 해 볼 것 |
 | --- | --- | --- |

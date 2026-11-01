@@ -3,6 +3,8 @@ package dev.arche.staff.internal;
 import dev.arche.common.BusinessException;
 import dev.arche.staff.CurrentStaff;
 import dev.arche.staff.Permission;
+import dev.arche.staff.Role;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -111,8 +113,11 @@ class LoginService {
 	private final PasswordEncoder encoder;
 	private final DefaultAccessLogger accessLog;
 	private final Clock clock;
+	private final boolean demoEnabled;
 
-	LoginService(StaffRepository staff, PasswordEncoder encoder, DefaultAccessLogger accessLog, Clock clock) {
+	LoginService(StaffRepository staff, PasswordEncoder encoder, DefaultAccessLogger accessLog, Clock clock,
+			@Value("${arche.demo.enabled:false}") boolean demoEnabled) {
+		this.demoEnabled = demoEnabled;
 		this.staff = staff;
 		this.encoder = encoder;
 		this.accessLog = accessLog;
@@ -122,7 +127,8 @@ class LoginService {
 	@Transactional(noRollbackFor = BusinessException.class)
 	Result authenticate(String loginId, String password) {
 		Staff s = staff.findByLoginId(loginId).orElse(null);
-		if (s == null || !s.enabled()) {
+		// 데모 전용 계정은 데모 모드가 꺼지면 로그인할 수 없다
+		if (s == null || !s.enabled() || (s.role() == Role.DEMO_ALL && !demoEnabled)) {
 			accessLog.write(null, loginId, "LOGIN_FAILED", "STAFF", loginId, "unknown");
 			throw new BusinessException("LOGIN_FAILED", "아이디 또는 비밀번호가 올바르지 않습니다");
 		}

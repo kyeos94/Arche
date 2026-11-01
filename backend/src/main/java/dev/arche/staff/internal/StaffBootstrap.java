@@ -14,13 +14,16 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 직원이 한 명도 없으면 초기 계정을 만든다.
  * <ul>
- * <li>데모(arche.demo.enabled=true): 역할마다 1명, 비밀번호 arche.demo.password, 첫 로그인 변경 생략</li>
+ * <li>데모(arche.demo.enabled=true): 역할마다 1명 + 모든 메뉴가 보이는 demo(DEMO_ALL), 비밀번호 arche.demo.password,
+ * 첫 로그인 변경 생략</li>
  * <li>그 외: 시스템관리자 admin 1명, 비밀번호 arche.bootstrap.admin-password, 첫 로그인에서 변경</li>
  * </ul>
  */
 @Component
 @Order(0)
 class StaffBootstrap implements ApplicationRunner {
+
+	static final String DEMO_LOGIN_ID = "demo";
 
 	private final StaffRepository staff;
 	private final PasswordEncoder encoder;
@@ -44,10 +47,15 @@ class StaffBootstrap implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		if (staff.count() > 0) {
+		LocalDate today = LocalDate.now(clock);
+		if (demo && staff.findByLoginId(DEMO_LOGIN_ID).isEmpty()) {
+			// 기존 데모 DB에도 추가되도록 직원 수와 관계없이 확인
+			staff.save(new Staff(DEMO_LOGIN_ID, "데모(전체 메뉴)", Role.DEMO_ALL, 9L, encoder.encode(demoPassword), today,
+					false));
+		}
+		if (staff.count() > (demo ? 1 : 0)) {
 			return;
 		}
-		LocalDate today = LocalDate.now(clock);
 		if (demo) {
 			String hash = encoder.encode(demoPassword);
 			staff.save(new Staff("uw", "김심사", Role.UNDERWRITER, 1L, hash, today, false));

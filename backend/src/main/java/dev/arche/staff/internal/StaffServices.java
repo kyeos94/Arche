@@ -97,7 +97,7 @@ class DefaultStaffDirectory implements StaffDirectory {
 			case COLLECTOR -> new DataScope(DataScope.Kind.OWN, Set.of(me.id()));
 			case COLLECTION_LEAD -> new DataScope(DataScope.Kind.TEAM,
 					staff.findByTeamId(me.teamId()).stream().map(Staff::getId).collect(Collectors.toSet()));
-			case TELLER, HEAD, SYSTEM_ADMIN -> DataScope.all();
+			case TELLER, HEAD, SYSTEM_ADMIN, DEMO_ALL -> DataScope.all();
 			case UNDERWRITER, UNDERWRITING_LEAD -> new DataScope(DataScope.Kind.OWN, Set.of());
 		};
 	}

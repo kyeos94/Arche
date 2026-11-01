@@ -45,4 +45,9 @@ class PermissionMatrixTest {
 					.isEqualTo(marks.get(i).equals("O"));
 		}
 	}
+
+	@org.junit.jupiter.api.Test
+	void 데모_전용_역할은_모든_권한을_가진다() {
+		assertThat(Permission.of(Role.DEMO_ALL)).containsExactlyInAnyOrder(Permission.values());
+	}
 }
