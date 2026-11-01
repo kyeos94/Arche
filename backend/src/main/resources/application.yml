@@ -42,6 +42,17 @@ arche:
   integration:
     virtual-account:
       secret: ${ARCHE_VA_SECRET:local-virtual-account-secret}
+    # 대출 비교 플랫폼 Mock (가상 플랫폼 코드). 수신 API는 X-Platform-Key 헤더로 인증
+    platform:
+      mock:
+        code: MOCKPLAT
+        api-key: ${ARCHE_PLATFORM_KEY:local-platform-key}
+  # 신청 서류 파일 저장 위치 (로컬 디스크 어댑터). 운영은 NAS 마운트 경로 등으로 교체
+  storage:
+    dir: ${ARCHE_STORAGE_DIR:${java.io.tmpdir}/arche-storage}
+  origination:
+    # 심사자 배정 전략: least-loaded(정책서 7장 기본) 또는 round-robin
+    assignment-strategy: ${ARCHE_ASSIGNMENT_STRATEGY:least-loaded}
   demo:
     # 데모 직원(역할별 1명)과 G11·G27·G28 재현용 계약을 만든다. 운영에서는 false
     enabled: ${ARCHE_DEMO:true}
