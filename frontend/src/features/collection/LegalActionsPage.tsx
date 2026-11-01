@@ -3,14 +3,26 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { ErrorMessage } from '@/components/ui/alert'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatMoney, legalLabel } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { LegalStatusBadge } from './LegalTab'
 
 /** 법조치 현황 (담당 범위 안, 최근 200건) */
 export function LegalActionsPage() {
   const [openOnly, setOpenOnly] = useState(true)
   const q = useQuery({ queryKey: queryKeys.legalActions(openOnly), queryFn: () => endpoints.legalActions(openOnly) })
+  const { sorted, header } = useSort(q.data, {
+    actionNo: (a) => a.actionNo,
+    accountNo: (a) => a.accountNo,
+    type: (a) => legalLabel(a.type),
+    status: (a) => legalLabel(a.status),
+    court: (a) => a.courtName,
+    caseRef: (a) => a.caseRef,
+    filedOn: (a) => a.filedOn,
+    claimAmount: (a) => a.claimAmount,
+    totalCost: (a) => a.totalCost,
+  })
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -24,20 +36,24 @@ export function LegalActionsPage() {
       <Table>
         <THead>
           <TR>
-            <TH>법조치 번호</TH>
-            <TH>계약번호</TH>
-            <TH>종류</TH>
-            <TH>단계</TH>
-            <TH>법원</TH>
-            <TH>사건 참조</TH>
-            <TH>신청일</TH>
-            <TH className="text-right">청구금액</TH>
-            <TH className="text-right">비용 합계</TH>
+            <SortTH {...header('actionNo')}>법조치 번호</SortTH>
+            <SortTH {...header('accountNo')}>계약번호</SortTH>
+            <SortTH {...header('type')}>종류</SortTH>
+            <SortTH {...header('status')}>단계</SortTH>
+            <SortTH {...header('court')}>법원</SortTH>
+            <SortTH {...header('caseRef')}>사건 참조</SortTH>
+            <SortTH {...header('filedOn')}>신청일</SortTH>
+            <SortTH {...header('claimAmount')} className="text-right">
+              청구금액
+            </SortTH>
+            <SortTH {...header('totalCost')} className="text-right">
+              비용 합계
+            </SortTH>
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={9} />}
-          {q.data?.map((a) => (
+          {sorted.map((a) => (
             <TR key={a.id}>
               <TD>{a.actionNo}</TD>
               <TD>

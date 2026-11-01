@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 const ACTION_LABEL = { GRANT: '부여', REVOKE: '회수', DEFAULT: '기본값으로', RESET_ALL: '전체 기본값' } as const
@@ -20,6 +21,14 @@ export function PermissionAdminPage() {
   const changes = useQuery({
     queryKey: adminConsoleKeys.permissionChanges,
     queryFn: () => adminConsole.permissionChanges(100),
+  })
+  const { sorted, header } = useSort(changes.data, {
+    changedAt: (c) => c.changedAt,
+    action: (c) => ACTION_LABEL[c.action],
+    role: (c) => c.roleLabel,
+    permission: (c) => c.permissionLabel,
+    changedBy: (c) => c.changedBy,
+    reason: (c) => c.reason,
   })
   const [reason, setReason] = useState('')
   const refresh = async () => {
@@ -128,17 +137,17 @@ export function PermissionAdminPage() {
           <Table>
             <THead>
               <TR>
-                <TH>일시</TH>
-                <TH>변경</TH>
-                <TH>역할</TH>
-                <TH>권한</TH>
-                <TH>처리자</TH>
-                <TH>사유</TH>
+                <SortTH {...header('changedAt')}>일시</SortTH>
+                <SortTH {...header('action')}>변경</SortTH>
+                <SortTH {...header('role')}>역할</SortTH>
+                <SortTH {...header('permission')}>권한</SortTH>
+                <SortTH {...header('changedBy')}>처리자</SortTH>
+                <SortTH {...header('reason')}>사유</SortTH>
               </TR>
             </THead>
             <TBody>
               {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 권한이 없습니다</EmptyRow>}
-              {changes.data?.map((c) => (
+              {sorted.map((c) => (
                 <TR key={c.id}>
                   <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
                   <TD>

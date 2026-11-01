@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { useInvalidateLoan } from '@/features/loans/hooks'
 import { formatNumber } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 const rowTone: Record<string, string> = {
   VALID: 'border-sky-200 bg-sky-50 text-sky-700',
@@ -39,6 +40,13 @@ export function BulkPage() {
   })
   const data = job.data ?? upload.data
   const completed = data?.status === 'COMPLETED'
+  // 앞의 200행만 보여 주므로 그 안에서 정렬
+  const { sorted, header } = useSort(data?.rows.slice(0, 200), {
+    rowNo: (r) => r.rowNo,
+    status: (r) => r.status,
+    payload: (r) => r.payload,
+    message: (r) => r.message,
+  })
   useEffect(() => {
     if (completed) void invalidate()
   }, [completed])
@@ -105,15 +113,15 @@ export function BulkPage() {
             <Table>
               <THead>
                 <TR>
-                  <TH>행</TH>
-                  <TH>상태</TH>
-                  <TH>내용</TH>
-                  <TH>메시지</TH>
+                  <SortTH {...header('rowNo')}>행</SortTH>
+                  <SortTH {...header('status')}>상태</SortTH>
+                  <SortTH {...header('payload')}>내용</SortTH>
+                  <SortTH {...header('message')}>메시지</SortTH>
                 </TR>
               </THead>
               <TBody>
                 {data.rows.length === 0 && <EmptyRow colSpan={4} />}
-                {data.rows.slice(0, 200).map((r) => (
+                {sorted.map((r) => (
                   <TR key={r.rowNo}>
                     <TD>{r.rowNo}</TD>
                     <TD>

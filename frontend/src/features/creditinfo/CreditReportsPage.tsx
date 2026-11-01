@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { sliceApi, sliceKeys, sliceLabel, sliceTones } from '@/features/communication/api'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 /**
@@ -32,6 +33,16 @@ export function CreditReportsPage() {
     mutationFn: ({ id, kind }: { id: number; kind: 'send' | 'result' }) =>
       kind === 'send' ? sliceApi.sendCreditReport(id) : sliceApi.creditReportResult(id),
     onSuccess: refresh,
+  })
+  const { sorted, header } = useSort(q.data?.files, {
+    baseDate: (f) => f.baseDate,
+    fileName: (f) => f.fileName,
+    recordCount: (f) => f.recordCount,
+    byteLength: (f) => f.byteLength,
+    status: (f) => sliceLabel(f.status),
+    sentAt: (f) => f.sentAt,
+    resultAt: (f) => f.resultAt,
+    errorCount: (f) => f.errorCount,
   })
   return (
     <div className="space-y-3">
@@ -58,20 +69,26 @@ export function CreditReportsPage() {
           <Table>
             <THead>
               <TR>
-                <TH>기준일</TH>
-                <TH>파일</TH>
-                <TH className="text-right">레코드</TH>
-                <TH className="text-right">바이트</TH>
-                <TH>상태</TH>
-                <TH>전송</TH>
-                <TH>결과</TH>
-                <TH className="text-right">오류</TH>
+                <SortTH {...header('baseDate')}>기준일</SortTH>
+                <SortTH {...header('fileName')}>파일</SortTH>
+                <SortTH {...header('recordCount')} className="text-right">
+                  레코드
+                </SortTH>
+                <SortTH {...header('byteLength')} className="text-right">
+                  바이트
+                </SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <SortTH {...header('sentAt')}>전송</SortTH>
+                <SortTH {...header('resultAt')}>결과</SortTH>
+                <SortTH {...header('errorCount')} className="text-right">
+                  오류
+                </SortTH>
                 <TH />
               </TR>
             </THead>
             <TBody>
               {q.data?.files.length === 0 && <EmptyRow colSpan={9} />}
-              {q.data?.files.map((f) => (
+              {sorted.map((f) => (
                 <TR key={f.id} className={cn(selected === f.id && 'bg-muted')}>
                   <TD>{formatDate(f.baseDate)}</TD>
                   <TD className="font-mono">
@@ -117,6 +134,15 @@ export function CreditReportsPage() {
 
 function RecordsCard({ id }: { id: number }) {
   const q = useQuery({ queryKey: sliceKeys.creditReport(id), queryFn: () => sliceApi.creditReport(id) })
+  const { sorted, header } = useSort(q.data?.records, {
+    seq: (r) => r.seq,
+    accountId: (r) => r.accountId,
+    recordType: (r) => sliceLabel(r.recordType),
+    eventDate: (r) => r.eventDate,
+    balance: (r) => r.balance,
+    delinquencyDays: (r) => r.delinquencyDays,
+    result: (r) => r.resultCode,
+  })
   return (
     <Card>
       <CardHeader>
@@ -127,18 +153,24 @@ function RecordsCard({ id }: { id: number }) {
         <Table>
           <THead>
             <TR>
-              <TH className="text-right">일련</TH>
-              <TH>계약</TH>
-              <TH>사유</TH>
-              <TH>사유일</TH>
-              <TH className="text-right">잔액</TH>
-              <TH className="text-right">연체일수</TH>
-              <TH>결과</TH>
+              <SortTH {...header('seq')} className="text-right">
+                일련
+              </SortTH>
+              <SortTH {...header('accountId')}>계약</SortTH>
+              <SortTH {...header('recordType')}>사유</SortTH>
+              <SortTH {...header('eventDate')}>사유일</SortTH>
+              <SortTH {...header('balance')} className="text-right">
+                잔액
+              </SortTH>
+              <SortTH {...header('delinquencyDays')} className="text-right">
+                연체일수
+              </SortTH>
+              <SortTH {...header('result')}>결과</SortTH>
             </TR>
           </THead>
           <TBody>
             {q.data?.records.length === 0 && <EmptyRow colSpan={7}>보고할 변경이 없었습니다</EmptyRow>}
-            {q.data?.records.map((r) => (
+            {sorted.map((r) => (
               <TR key={r.seq} className={cn(r.resultCode && r.resultCode !== '0000' && 'text-red-700')}>
                 <TD className="num">{r.seq}</TD>
                 <TD>
