@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { Field, Input } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { sliceApi, sliceKeys, sliceLabel, sliceTones } from '@/features/communication/api'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +46,7 @@ export function CreditReportsPage() {
     resultAt: (f) => f.resultAt,
     errorCount: (f) => f.errorCount,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <Card>
@@ -66,68 +69,70 @@ export function CreditReportsPage() {
             </Button>
           </form>
           <ErrorMessage error={run.error ?? step.error ?? q.error} />
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('baseDate')}>기준일</SortTH>
-                <SortTH {...header('fileName')}>파일</SortTH>
-                <SortTH {...header('recordCount')} className="text-right">
-                  레코드
-                </SortTH>
-                <SortTH {...header('byteLength')} className="text-right">
-                  바이트
-                </SortTH>
-                <SortTH {...header('status')}>상태</SortTH>
-                <SortTH {...header('sentAt')}>전송</SortTH>
-                <SortTH {...header('resultAt')}>결과</SortTH>
-                <SortTH {...header('errorCount')} className="text-right">
-                  오류
-                </SortTH>
-                <TH />
-              </TR>
-            </THead>
-            <TBody>
-              {q.data?.files.length === 0 && <EmptyRow colSpan={9} />}
-              {sorted.map((f) => (
-                <TR key={f.id} className={cn(selected === f.id && 'bg-muted')}>
-                  <TD>{formatDate(f.baseDate)}</TD>
-                  <TD className="font-mono">
-                    <a className="text-primary hover:underline" href={sliceApi.creditReportFileUrl(f.id)}>
-                      {f.fileName}
-                    </a>
-                  </TD>
-                  <TD className="num">{formatNumber(f.recordCount)}</TD>
-                  <TD className="num">{formatNumber(f.byteLength)}</TD>
-                  <TD>
-                    <Badge className={sliceTones[f.status] ?? 'bg-muted'}>{sliceLabel(f.status)}</Badge>
-                  </TD>
-                  <TD>{formatDateTime(f.sentAt)}</TD>
-                  <TD>{formatDateTime(f.resultAt)}</TD>
-                  <TD className={cn('num', f.errorCount > 0 && 'text-red-700')}>{f.errorCount}</TD>
-                  <TD>
-                    <div className="flex gap-1">
-                      {f.status === 'GENERATED' && (
-                        <Button size="sm" variant="outline" onClick={() => step.mutate({ id: f.id, kind: 'send' })}>
-                          전송
-                        </Button>
-                      )}
-                      {f.status === 'SENT' && (
-                        <Button size="sm" variant="outline" onClick={() => step.mutate({ id: f.id, kind: 'result' })}>
-                          결과 반영
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => setSelected(f.id)}>
-                        레코드
-                      </Button>
-                    </div>
-                  </TD>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('baseDate')}>기준일</SortTH>
+                  <SortTH {...header('fileName')}>파일</SortTH>
+                  <SortTH {...header('recordCount')} className="text-right">
+                    레코드
+                  </SortTH>
+                  <SortTH {...header('byteLength')} className="text-right">
+                    바이트
+                  </SortTH>
+                  <SortTH {...header('status')}>상태</SortTH>
+                  <SortTH {...header('sentAt')}>전송</SortTH>
+                  <SortTH {...header('resultAt')}>결과</SortTH>
+                  <SortTH {...header('errorCount')} className="text-right">
+                    오류
+                  </SortTH>
+                  <TH />
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {q.data?.files.length === 0 && <EmptyRow colSpan={9} />}
+                {paging.rows.map((f) => (
+                  <TR key={f.id} className={cn(selected === f.id && 'bg-muted')}>
+                    <TD>{formatDate(f.baseDate)}</TD>
+                    <TD className="font-mono">
+                      <a className="text-primary hover:underline" href={sliceApi.creditReportFileUrl(f.id)}>
+                        {f.fileName}
+                      </a>
+                    </TD>
+                    <TD className="num">{formatNumber(f.recordCount)}</TD>
+                    <TD className="num">{formatNumber(f.byteLength)}</TD>
+                    <TD>
+                      <Badge className={sliceTones[f.status] ?? 'bg-muted'}>{sliceLabel(f.status)}</Badge>
+                    </TD>
+                    <TD>{formatDateTime(f.sentAt)}</TD>
+                    <TD>{formatDateTime(f.resultAt)}</TD>
+                    <TD className={cn('num', f.errorCount > 0 && 'text-red-700')}>{f.errorCount}</TD>
+                    <TD>
+                      <div className="flex gap-1">
+                        {f.status === 'GENERATED' && (
+                          <Button size="sm" variant="outline" onClick={() => step.mutate({ id: f.id, kind: 'send' })}>
+                            전송
+                          </Button>
+                        )}
+                        {f.status === 'SENT' && (
+                          <Button size="sm" variant="outline" onClick={() => step.mutate({ id: f.id, kind: 'result' })}>
+                            결과 반영
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => setSelected(f.id)}>
+                          레코드
+                        </Button>
+                      </div>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
-      {selected !== null && <RecordsCard id={selected} />}
+      {selected !== null && <RecordsCard key={selected} id={selected} />}
     </div>
   )
 }
@@ -143,6 +148,7 @@ function RecordsCard({ id }: { id: number }) {
     delinquencyDays: (r) => r.delinquencyDays,
     result: (r) => r.resultCode,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -150,45 +156,47 @@ function RecordsCard({ id }: { id: number }) {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={q.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('seq')} className="text-right">
-                일련
-              </SortTH>
-              <SortTH {...header('accountId')}>계약</SortTH>
-              <SortTH {...header('recordType')}>사유</SortTH>
-              <SortTH {...header('eventDate')}>사유일</SortTH>
-              <SortTH {...header('balance')} className="text-right">
-                잔액
-              </SortTH>
-              <SortTH {...header('delinquencyDays')} className="text-right">
-                연체일수
-              </SortTH>
-              <SortTH {...header('result')}>결과</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {q.data?.records.length === 0 && <EmptyRow colSpan={7}>보고할 변경이 없었습니다</EmptyRow>}
-            {sorted.map((r) => (
-              <TR key={r.seq} className={cn(r.resultCode && r.resultCode !== '0000' && 'text-red-700')}>
-                <TD className="num">{r.seq}</TD>
-                <TD>
-                  <Link className="text-primary hover:underline" to={`/loans/${r.accountId}`}>
-                    #{r.accountId}
-                  </Link>
-                </TD>
-                <TD>{sliceLabel(r.recordType)}</TD>
-                <TD>{formatDate(r.eventDate)}</TD>
-                <TD className="num">{formatMoney(r.balance)}</TD>
-                <TD className="num">{r.delinquencyDays}</TD>
-                <TD>
-                  {r.resultCode ?? '-'} {r.resultMessage}
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('seq')} className="text-right">
+                  일련
+                </SortTH>
+                <SortTH {...header('accountId')}>계약</SortTH>
+                <SortTH {...header('recordType')}>사유</SortTH>
+                <SortTH {...header('eventDate')}>사유일</SortTH>
+                <SortTH {...header('balance')} className="text-right">
+                  잔액
+                </SortTH>
+                <SortTH {...header('delinquencyDays')} className="text-right">
+                  연체일수
+                </SortTH>
+                <SortTH {...header('result')}>결과</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {q.data?.records.length === 0 && <EmptyRow colSpan={7}>보고할 변경이 없었습니다</EmptyRow>}
+              {paging.rows.map((r) => (
+                <TR key={r.seq} className={cn(r.resultCode && r.resultCode !== '0000' && 'text-red-700')}>
+                  <TD className="num">{r.seq}</TD>
+                  <TD>
+                    <Link className="text-primary hover:underline" to={`/loans/${r.accountId}`}>
+                      #{r.accountId}
+                    </Link>
+                  </TD>
+                  <TD>{sliceLabel(r.recordType)}</TD>
+                  <TD>{formatDate(r.eventDate)}</TD>
+                  <TD className="num">{formatMoney(r.balance)}</TD>
+                  <TD className="num">{r.delinquencyDays}</TD>
+                  <TD>
+                    {r.resultCode ?? '-'} {r.resultMessage}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )

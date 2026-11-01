@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
+import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
 import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatMoney, legalLabel } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { LegalStatusBadge } from './LegalTab'
 
@@ -23,57 +25,67 @@ export function LegalActionsPage() {
     claimAmount: (a) => a.claimAmount,
     totalCost: (a) => a.totalCost,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h1 className="text-base font-semibold">법조치 현황</h1>
         <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={openOnly}
+            onChange={(e) => {
+              setOpenOnly(e.target.checked)
+              paging.setPage(0)
+            }}
+          />
           진행 중만
         </label>
       </div>
       <ErrorMessage error={q.error} />
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('actionNo')}>법조치 번호</SortTH>
-            <SortTH {...header('accountNo')}>계약번호</SortTH>
-            <SortTH {...header('type')}>종류</SortTH>
-            <SortTH {...header('status')}>단계</SortTH>
-            <SortTH {...header('court')}>법원</SortTH>
-            <SortTH {...header('caseRef')}>사건 참조</SortTH>
-            <SortTH {...header('filedOn')}>신청일</SortTH>
-            <SortTH {...header('claimAmount')} className="text-right">
-              청구금액
-            </SortTH>
-            <SortTH {...header('totalCost')} className="text-right">
-              비용 합계
-            </SortTH>
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.length === 0 && <EmptyRow colSpan={9} />}
-          {sorted.map((a) => (
-            <TR key={a.id}>
-              <TD>{a.actionNo}</TD>
-              <TD>
-                <Link to={`/loans/${a.accountId}`} className="text-primary hover:underline">
-                  {a.accountNo}
-                </Link>
-              </TD>
-              <TD>{legalLabel(a.type)}</TD>
-              <TD>
-                <LegalStatusBadge status={a.status} />
-              </TD>
-              <TD>{a.courtName ?? '-'}</TD>
-              <TD>{a.caseRef ?? '-'}</TD>
-              <TD>{formatDate(a.filedOn)}</TD>
-              <TD className="num">{formatMoney(a.claimAmount)}</TD>
-              <TD className="num">{formatMoney(a.totalCost)}</TD>
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('actionNo')}>법조치 번호</SortTH>
+              <SortTH {...header('accountNo')}>계약번호</SortTH>
+              <SortTH {...header('type')}>종류</SortTH>
+              <SortTH {...header('status')}>단계</SortTH>
+              <SortTH {...header('court')}>법원</SortTH>
+              <SortTH {...header('caseRef')}>사건 참조</SortTH>
+              <SortTH {...header('filedOn')}>신청일</SortTH>
+              <SortTH {...header('claimAmount')} className="text-right">
+                청구금액
+              </SortTH>
+              <SortTH {...header('totalCost')} className="text-right">
+                비용 합계
+              </SortTH>
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.length === 0 && <EmptyRow colSpan={9} />}
+            {paging.rows.map((a) => (
+              <TR key={a.id}>
+                <TD>{a.actionNo}</TD>
+                <TD>
+                  <Link to={`/loans/${a.accountId}`} className="text-primary hover:underline">
+                    {a.accountNo}
+                  </Link>
+                </TD>
+                <TD>{legalLabel(a.type)}</TD>
+                <TD>
+                  <LegalStatusBadge status={a.status} />
+                </TD>
+                <TD>{a.courtName ?? '-'}</TD>
+                <TD>{a.caseRef ?? '-'}</TD>
+                <TD>{formatDate(a.filedOn)}</TD>
+                <TD className="num">{formatMoney(a.claimAmount)}</TD>
+                <TD className="num">{formatMoney(a.totalCost)}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

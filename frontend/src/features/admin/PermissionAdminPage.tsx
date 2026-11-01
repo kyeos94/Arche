@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type PermissionCell, adminConsole, adminConsoleKeys } from '@/api/adminConsole'
 import { queryKeys } from '@/api/endpoints'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +32,7 @@ export function PermissionAdminPage() {
     changedBy: (c) => c.changedBy,
     reason: (c) => c.reason,
   })
+  const paging = usePaging(sorted)
   const [reason, setReason] = useState('')
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: adminConsoleKeys.permissionChanges })
@@ -134,33 +137,35 @@ export function PermissionAdminPage() {
           <CardTitle>변경 이력</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('changedAt')}>일시</SortTH>
-                <SortTH {...header('action')}>변경</SortTH>
-                <SortTH {...header('role')}>역할</SortTH>
-                <SortTH {...header('permission')}>권한</SortTH>
-                <SortTH {...header('changedBy')}>처리자</SortTH>
-                <SortTH {...header('reason')}>사유</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 권한이 없습니다</EmptyRow>}
-              {sorted.map((c) => (
-                <TR key={c.id}>
-                  <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
-                  <TD>
-                    <Badge>{ACTION_LABEL[c.action]}</Badge>
-                  </TD>
-                  <TD>{c.roleLabel ?? '-'}</TD>
-                  <TD>{c.permissionLabel ?? '-'}</TD>
-                  <TD>{c.changedBy}</TD>
-                  <TD>{c.reason}</TD>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('changedAt')}>일시</SortTH>
+                  <SortTH {...header('action')}>변경</SortTH>
+                  <SortTH {...header('role')}>역할</SortTH>
+                  <SortTH {...header('permission')}>권한</SortTH>
+                  <SortTH {...header('changedBy')}>처리자</SortTH>
+                  <SortTH {...header('reason')}>사유</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 권한이 없습니다</EmptyRow>}
+                {paging.rows.map((c) => (
+                  <TR key={c.id}>
+                    <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
+                    <TD>
+                      <Badge>{ACTION_LABEL[c.action]}</Badge>
+                    </TD>
+                    <TD>{c.roleLabel ?? '-'}</TD>
+                    <TD>{c.permissionLabel ?? '-'}</TD>
+                    <TD>{c.changedBy}</TD>
+                    <TD>{c.reason}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
     </div>

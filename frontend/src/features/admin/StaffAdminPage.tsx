@@ -10,6 +10,7 @@ import {
 } from '@/api/adminConsole'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { StaffRow } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ import { Input, Select, Textarea } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { StaffRoleDialog } from './StaffRoleDialog'
 
@@ -71,6 +73,7 @@ function StaffList() {
     failed: (s) => s.failedAttempts,
     status: (s) => (!s.enabled ? 2 : s.locked ? 1 : 0),
   })
+  const paging = usePaging(sorted)
   const activeCount = staff.data?.filter((s) => s.enabled).length ?? 0
   const resignedCount = (staff.data?.length ?? 0) - activeCount
   const lockedReason = (s: StaffRow) =>
@@ -86,7 +89,14 @@ function StaffList() {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Select aria-label="재직 구분" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+          <Select
+            aria-label="재직 구분"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value as Filter)
+              paging.setPage(0)
+            }}
+          >
             <option value="ACTIVE">재직 ({activeCount})</option>
             <option value="RESIGNED">퇴사 ({resignedCount})</option>
             <option value="ALL">전체</option>
@@ -96,73 +106,78 @@ function StaffList() {
             className="w-56"
             placeholder="이름·아이디·팀"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              paging.setPage(0)
+            }}
           />
         </div>
         <ErrorMessage error={staff.error ?? options.error ?? unlock.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('id')}>ID</SortTH>
-              <SortTH {...header('loginId')}>아이디</SortTH>
-              <SortTH {...header('name')}>이름</SortTH>
-              <SortTH {...header('role')}>역할</SortTH>
-              <SortTH {...header('team')}>팀</SortTH>
-              <SortTH {...header('failed')}>로그인 실패</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {staff.data && rows.length === 0 && <EmptyRow colSpan={8}>해당하는 직원이 없습니다</EmptyRow>}
-            {sorted.map((s) => (
-              <TR key={s.id} className={s.enabled ? undefined : 'text-muted-foreground'}>
-                <TD>{s.id}</TD>
-                <TD>{s.loginId}</TD>
-                <TD>{s.name}</TD>
-                <TD>{s.roleLabel}</TD>
-                <TD>{teamName(s.teamId)}</TD>
-                <TD className="num">{s.failedAttempts}</TD>
-                <TD>
-                  {!s.enabled ? (
-                    <Badge className="border-slate-300 bg-slate-100 text-slate-600">
-                      퇴사 {s.resignedAt ? formatDate(s.resignedAt.slice(0, 10)) : ''}
-                    </Badge>
-                  ) : s.locked ? (
-                    <Badge className="border-red-200 bg-red-50 text-red-700">잠김</Badge>
-                  ) : (
-                    <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">재직</Badge>
-                  )}
-                </TD>
-                <TD className="space-x-1 whitespace-nowrap">
-                  {s.enabled && options.data && (
-                    <StaffRoleDialog staff={s} options={options.data} disabledReason={lockedReason(s)} />
-                  )}
-                  {s.enabled && s.locked && (
-                    <Button size="sm" variant="outline" onClick={() => unlock.mutate(s.id)}>
-                      잠금 해제
-                    </Button>
-                  )}
-                  {s.enabled ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!!lockedReason(s)}
-                      title={lockedReason(s)}
-                      onClick={() => setDialog({ kind: 'resign', staff: s })}
-                    >
-                      퇴사 처리
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'reinstate', staff: s })}>
-                      복직
-                    </Button>
-                  )}
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('id')}>ID</SortTH>
+                <SortTH {...header('loginId')}>아이디</SortTH>
+                <SortTH {...header('name')}>이름</SortTH>
+                <SortTH {...header('role')}>역할</SortTH>
+                <SortTH {...header('team')}>팀</SortTH>
+                <SortTH {...header('failed')}>로그인 실패</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <TH />
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {staff.data && rows.length === 0 && <EmptyRow colSpan={8}>해당하는 직원이 없습니다</EmptyRow>}
+              {paging.rows.map((s) => (
+                <TR key={s.id} className={s.enabled ? undefined : 'text-muted-foreground'}>
+                  <TD>{s.id}</TD>
+                  <TD>{s.loginId}</TD>
+                  <TD>{s.name}</TD>
+                  <TD>{s.roleLabel}</TD>
+                  <TD>{teamName(s.teamId)}</TD>
+                  <TD className="num">{s.failedAttempts}</TD>
+                  <TD>
+                    {!s.enabled ? (
+                      <Badge className="border-slate-300 bg-slate-100 text-slate-600">
+                        퇴사 {s.resignedAt ? formatDate(s.resignedAt.slice(0, 10)) : ''}
+                      </Badge>
+                    ) : s.locked ? (
+                      <Badge className="border-red-200 bg-red-50 text-red-700">잠김</Badge>
+                    ) : (
+                      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">재직</Badge>
+                    )}
+                  </TD>
+                  <TD className="space-x-1 whitespace-nowrap">
+                    {s.enabled && options.data && (
+                      <StaffRoleDialog staff={s} options={options.data} disabledReason={lockedReason(s)} />
+                    )}
+                    {s.enabled && s.locked && (
+                      <Button size="sm" variant="outline" onClick={() => unlock.mutate(s.id)}>
+                        잠금 해제
+                      </Button>
+                    )}
+                    {s.enabled ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!lockedReason(s)}
+                        title={lockedReason(s)}
+                        onClick={() => setDialog({ kind: 'resign', staff: s })}
+                      >
+                        퇴사 처리
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'reinstate', staff: s })}>
+                        복직
+                      </Button>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
       {dialog?.kind === 'create' && options.data && (
         <CreateDialog options={options.data} onClose={() => setDialog(null)} onDone={refresh} />
@@ -433,6 +448,7 @@ function ReinstateDialog({ staff, onClose, onDone }: { staff: StaffRow; onClose:
 
 function StatusChanges() {
   const changes = useQuery({ queryKey: staffAccountKeys.changes, queryFn: staffAccounts.changes })
+  const paging = usePaging(changes.data)
   return (
     <Card>
       <CardHeader>
@@ -440,33 +456,35 @@ function StatusChanges() {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={changes.error} />
-        <Table>
-          <THead>
-            <TR>
-              <TH>일시</TH>
-              <TH>직원</TH>
-              <TH>구분</TH>
-              <TH>사유</TH>
-              <TH>담당 건 이관</TH>
-              <TH>처리자</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {changes.data?.length === 0 && <EmptyRow colSpan={6}>이력이 없습니다</EmptyRow>}
-            {changes.data?.map((c) => (
-              <TR key={c.id}>
-                <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
-                <TD>
-                  {c.staffName} ({c.loginId})
-                </TD>
-                <TD>{ACTION_LABEL[c.action]}</TD>
-                <TD>{c.reason}</TD>
-                <TD>{c.detail ?? '-'}</TD>
-                <TD>{c.changedBy}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <TH>일시</TH>
+                <TH>직원</TH>
+                <TH>구분</TH>
+                <TH>사유</TH>
+                <TH>담당 건 이관</TH>
+                <TH>처리자</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {changes.data?.length === 0 && <EmptyRow colSpan={6}>이력이 없습니다</EmptyRow>}
+              {paging.rows.map((c) => (
+                <TR key={c.id}>
+                  <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
+                  <TD>
+                    {c.staffName} ({c.loginId})
+                  </TD>
+                  <TD>{ACTION_LABEL[c.action]}</TD>
+                  <TD>{c.reason}</TD>
+                  <TD>{c.detail ?? '-'}</TD>
+                  <TD>{c.changedBy}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
@@ -474,6 +492,7 @@ function StatusChanges() {
 
 function RoleChanges() {
   const changes = useQuery({ queryKey: staffRoleKeys.changes, queryFn: staffRoles.changes })
+  const paging = usePaging(changes.data)
   return (
     <Card>
       <CardHeader>
@@ -481,37 +500,39 @@ function RoleChanges() {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={changes.error} />
-        <Table>
-          <THead>
-            <TR>
-              <TH>일시</TH>
-              <TH>직원</TH>
-              <TH>변경 전</TH>
-              <TH>변경 후</TH>
-              <TH>처리자</TH>
-              <TH>사유</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {changes.data?.length === 0 && <EmptyRow colSpan={6}>역할을 바꾼 직원이 없습니다</EmptyRow>}
-            {changes.data?.map((c) => (
-              <TR key={c.id}>
-                <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
-                <TD>
-                  {c.staffName} ({c.loginId})
-                </TD>
-                <TD>
-                  {c.fromRole} · {c.fromTeam ?? '-'}
-                </TD>
-                <TD>
-                  {c.toRole} · {c.toTeam ?? '-'}
-                </TD>
-                <TD>{c.changedBy}</TD>
-                <TD>{c.reason}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <TH>일시</TH>
+                <TH>직원</TH>
+                <TH>변경 전</TH>
+                <TH>변경 후</TH>
+                <TH>처리자</TH>
+                <TH>사유</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {changes.data?.length === 0 && <EmptyRow colSpan={6}>역할을 바꾼 직원이 없습니다</EmptyRow>}
+              {paging.rows.map((c) => (
+                <TR key={c.id}>
+                  <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
+                  <TD>
+                    {c.staffName} ({c.loginId})
+                  </TD>
+                  <TD>
+                    {c.fromRole} · {c.fromTeam ?? '-'}
+                  </TD>
+                  <TD>
+                    {c.toRole} · {c.toTeam ?? '-'}
+                  </TD>
+                  <TD>{c.changedBy}</TD>
+                  <TD>{c.reason}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )

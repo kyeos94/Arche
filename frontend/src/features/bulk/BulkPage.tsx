@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { BulkJob } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { useInvalidateLoan } from '@/features/loans/hooks'
 import { formatNumber } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 const rowTone: Record<string, string> = {
@@ -40,13 +42,14 @@ export function BulkPage() {
   })
   const data = job.data ?? upload.data
   const completed = data?.status === 'COMPLETED'
-  // 앞의 200행만 보여 주므로 그 안에서 정렬
-  const { sorted, header } = useSort(data?.rows.slice(0, 200), {
+  // 받은 행 전체를 정렬한 뒤 페이지로 나눈다
+  const { sorted, header } = useSort(data?.rows, {
     rowNo: (r) => r.rowNo,
     status: (r) => r.status,
     payload: (r) => r.payload,
     message: (r) => r.message,
   })
+  const paging = usePaging(sorted)
   useEffect(() => {
     if (completed) void invalidate()
   }, [completed])
@@ -110,32 +113,31 @@ export function BulkPage() {
             )}
             {data.status === 'COMPLETED' && <Alert tone="success">일괄 처리가 끝났습니다.</Alert>}
             <ErrorMessage error={execute.error ?? job.error} />
-            <Table>
-              <THead>
-                <TR>
-                  <SortTH {...header('rowNo')}>행</SortTH>
-                  <SortTH {...header('status')}>상태</SortTH>
-                  <SortTH {...header('payload')}>내용</SortTH>
-                  <SortTH {...header('message')}>메시지</SortTH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.rows.length === 0 && <EmptyRow colSpan={4} />}
-                {sorted.map((r) => (
-                  <TR key={r.rowNo}>
-                    <TD>{r.rowNo}</TD>
-                    <TD>
-                      <Badge className={rowTone[r.status]}>{r.status}</Badge>
-                    </TD>
-                    <TD className="text-muted-foreground">{r.payload}</TD>
-                    <TD>{r.message ?? ''}</TD>
+            <PagedList paging={paging.props}>
+              <Table>
+                <THead>
+                  <TR>
+                    <SortTH {...header('rowNo')}>행</SortTH>
+                    <SortTH {...header('status')}>상태</SortTH>
+                    <SortTH {...header('payload')}>내용</SortTH>
+                    <SortTH {...header('message')}>메시지</SortTH>
                   </TR>
-                ))}
-              </TBody>
-            </Table>
-            {data.rows.length > 200 && (
-              <p className="text-xs text-muted-foreground">앞의 200행만 표시합니다.</p>
-            )}
+                </THead>
+                <TBody>
+                  {data.rows.length === 0 && <EmptyRow colSpan={4} />}
+                  {paging.rows.map((r) => (
+                    <TR key={r.rowNo}>
+                      <TD>{r.rowNo}</TD>
+                      <TD>
+                        <Badge className={rowTone[r.status]}>{r.status}</Badge>
+                      </TD>
+                      <TD className="text-muted-foreground">{r.payload}</TD>
+                      <TD>{r.message ?? ''}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </PagedList>
           </CardContent>
         </Card>
       )}

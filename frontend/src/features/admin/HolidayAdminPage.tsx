@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useState } from 'react'
 import { type HolidayYear, adminConsole, adminConsoleKeys } from '@/api/adminConsole'
 import { endpoints, queryKeys } from '@/api/endpoints'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
@@ -245,6 +247,7 @@ function HolidayChanges() {
     name: (c) => c.name,
     changedBy: (c) => c.changedBy,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -252,31 +255,33 @@ function HolidayChanges() {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={changes.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('changedAt')}>일시</SortTH>
-              <SortTH {...header('businessDate')}>업무일자</SortTH>
-              <SortTH {...header('date')}>날짜</SortTH>
-              <SortTH {...header('action')}>변경</SortTH>
-              <SortTH {...header('name')}>휴일 이름</SortTH>
-              <SortTH {...header('changedBy')}>변경한 직원</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 휴일이 없습니다</EmptyRow>}
-            {sorted.map((c) => (
-              <TR key={c.id}>
-                <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
-                <TD>{formatDate(c.businessDate)}</TD>
-                <TD className="tabular-nums">{formatDate(c.date)}</TD>
-                <TD>{c.action === 'ADD' ? '휴일 지정' : '휴일 해제'}</TD>
-                <TD>{c.name}</TD>
-                <TD>{c.changedBy}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('changedAt')}>일시</SortTH>
+                <SortTH {...header('businessDate')}>업무일자</SortTH>
+                <SortTH {...header('date')}>날짜</SortTH>
+                <SortTH {...header('action')}>변경</SortTH>
+                <SortTH {...header('name')}>휴일 이름</SortTH>
+                <SortTH {...header('changedBy')}>변경한 직원</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 휴일이 없습니다</EmptyRow>}
+              {paging.rows.map((c) => (
+                <TR key={c.id}>
+                  <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
+                  <TD>{formatDate(c.businessDate)}</TD>
+                  <TD className="tabular-nums">{formatDate(c.date)}</TD>
+                  <TD>{c.action === 'ADD' ? '휴일 지정' : '휴일 해제'}</TD>
+                  <TD>{c.name}</TD>
+                  <TD>{c.changedBy}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )

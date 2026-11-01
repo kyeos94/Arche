@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 function Closing() {
@@ -31,6 +33,7 @@ function Closing() {
     accelerations: (c) => c.accelerations,
     mismatches: (c) => c.mismatches,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -67,55 +70,57 @@ function Closing() {
             {close.data.mismatches}
           </Alert>
         )}
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('businessDate')}>업무일자</SortTH>
-              <SortTH {...header('closedAt')}>마감 시각</SortTH>
-              <SortTH {...header('paymentCount')} className="text-right">
-                입금 건수
-              </SortTH>
-              <SortTH {...header('paymentTotal')} className="text-right">
-                입금 합계
-              </SortTH>
-              <SortTH {...header('correctionTotal')} className="text-right">
-                정정
-              </SortTH>
-              <SortTH {...header('unmatchedTotal')} className="text-right">
-                미확인 잔액
-              </SortTH>
-              <SortTH {...header('accountsJudged')} className="text-right">
-                판정
-              </SortTH>
-              <SortTH {...header('newNotices')} className="text-right">
-                새 통지
-              </SortTH>
-              <SortTH {...header('accelerations')} className="text-right">
-                상실
-              </SortTH>
-              <SortTH {...header('mismatches')} className="text-right">
-                대사 불일치
-              </SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {closings.data?.length === 0 && <EmptyRow colSpan={10} />}
-            {sorted.map((c) => (
-              <TR key={c.businessDate}>
-                <TD>{formatDate(c.businessDate)}</TD>
-                <TD>{formatDateTime(c.closedAt)}</TD>
-                <TD className="num">{formatNumber(c.paymentCount)}</TD>
-                <TD className="num">{formatMoney(c.paymentTotal)}</TD>
-                <TD className="num">{formatMoney(c.correctionTotal)}</TD>
-                <TD className="num">{formatMoney(c.unmatchedTotal)}</TD>
-                <TD className="num">{formatNumber(c.accountsJudged)}</TD>
-                <TD className="num">{formatNumber(c.newNotices)}</TD>
-                <TD className="num">{formatNumber(c.accelerations)}</TD>
-                <TD className={c.mismatches > 0 ? 'num text-destructive' : 'num'}>{formatNumber(c.mismatches)}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('businessDate')}>업무일자</SortTH>
+                <SortTH {...header('closedAt')}>마감 시각</SortTH>
+                <SortTH {...header('paymentCount')} className="text-right">
+                  입금 건수
+                </SortTH>
+                <SortTH {...header('paymentTotal')} className="text-right">
+                  입금 합계
+                </SortTH>
+                <SortTH {...header('correctionTotal')} className="text-right">
+                  정정
+                </SortTH>
+                <SortTH {...header('unmatchedTotal')} className="text-right">
+                  미확인 잔액
+                </SortTH>
+                <SortTH {...header('accountsJudged')} className="text-right">
+                  판정
+                </SortTH>
+                <SortTH {...header('newNotices')} className="text-right">
+                  새 통지
+                </SortTH>
+                <SortTH {...header('accelerations')} className="text-right">
+                  상실
+                </SortTH>
+                <SortTH {...header('mismatches')} className="text-right">
+                  대사 불일치
+                </SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {closings.data?.length === 0 && <EmptyRow colSpan={10} />}
+              {paging.rows.map((c) => (
+                <TR key={c.businessDate}>
+                  <TD>{formatDate(c.businessDate)}</TD>
+                  <TD>{formatDateTime(c.closedAt)}</TD>
+                  <TD className="num">{formatNumber(c.paymentCount)}</TD>
+                  <TD className="num">{formatMoney(c.paymentTotal)}</TD>
+                  <TD className="num">{formatMoney(c.correctionTotal)}</TD>
+                  <TD className="num">{formatMoney(c.unmatchedTotal)}</TD>
+                  <TD className="num">{formatNumber(c.accountsJudged)}</TD>
+                  <TD className="num">{formatNumber(c.newNotices)}</TD>
+                  <TD className="num">{formatNumber(c.accelerations)}</TD>
+                  <TD className={c.mismatches > 0 ? 'num text-destructive' : 'num'}>{formatNumber(c.mismatches)}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
@@ -130,6 +135,7 @@ function AccessLogs() {
     action: (l) => l.action,
     reason: (l) => l.reason,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -137,33 +143,35 @@ function AccessLogs() {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={logs.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('accessedAt')}>시각</SortTH>
-              <SortTH {...header('loginId')}>계정</SortTH>
-              <SortTH {...header('ip')}>IP</SortTH>
-              <SortTH {...header('action')}>업무</SortTH>
-              <TH>대상</TH>
-              <SortTH {...header('reason')}>사유</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {logs.data?.length === 0 && <EmptyRow colSpan={6} />}
-            {sorted.map((l, i) => (
-              <TR key={`${l.accessedAt}-${i}`}>
-                <TD>{formatDateTime(l.accessedAt)}</TD>
-                <TD>{l.loginId}</TD>
-                <TD>{l.ip ?? '-'}</TD>
-                <TD>{l.action}</TD>
-                <TD>
-                  {l.targetType ?? ''} {l.targetId ?? ''}
-                </TD>
-                <TD>{l.reason ?? ''}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('accessedAt')}>시각</SortTH>
+                <SortTH {...header('loginId')}>계정</SortTH>
+                <SortTH {...header('ip')}>IP</SortTH>
+                <SortTH {...header('action')}>업무</SortTH>
+                <TH>대상</TH>
+                <SortTH {...header('reason')}>사유</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {logs.data?.length === 0 && <EmptyRow colSpan={6} />}
+              {paging.rows.map((l, i) => (
+                <TR key={`${l.accessedAt}-${i}`}>
+                  <TD>{formatDateTime(l.accessedAt)}</TD>
+                  <TD>{l.loginId}</TD>
+                  <TD>{l.ip ?? '-'}</TD>
+                  <TD>{l.action}</TD>
+                  <TD>
+                    {l.targetType ?? ''} {l.targetId ?? ''}
+                  </TD>
+                  <TD>{l.reason ?? ''}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
