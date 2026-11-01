@@ -49,6 +49,8 @@ export const adminConsoleKeys = {
   menus: ['menus'] as const,
   permissions: ['admin', 'permissions'] as const,
   permissionChanges: ['admin', 'permissions', 'changes'] as const,
+  holidays: (year: number) => ['admin', 'holidays', year] as const,
+  holidayChanges: ['admin', 'holidays', 'changes'] as const,
 }
 
 export const adminConsole = {
@@ -60,6 +62,30 @@ export const adminConsole = {
   resetPermissions: (reason: string) => api.post<PermissionMatrix>('/api/admin/permissions/reset', { reason }),
   permissionChanges: (limit = 100) =>
     api.get<PermissionChange[]>(`/api/admin/permissions/changes${qs({ limit })}`),
+  holidays: (year: number) => api.get<HolidayYear>(`/api/admin/holidays${qs({ year })}`),
+  addHoliday: (date: string, name: string) => api.post<HolidayYear>('/api/admin/holidays', { date, name }),
+  removeHoliday: (date: string) => api.post<HolidayYear>('/api/admin/holidays/removal', { date }),
+  holidayChanges: (limit = 100) => api.get<HolidayChange[]>(`/api/admin/holidays/changes${qs({ limit })}`),
+}
+
+/** 휴일 관리 (R73) */
+export interface HolidayYear {
+  year: number
+  businessDate: string
+  /** 이 날부터 바꿀 수 있음 (업무일자 다음 날) */
+  editableFrom: string
+  editableTo: string
+  holidays: { date: string; name: string }[]
+}
+
+export interface HolidayChange {
+  id: number
+  date: string
+  action: 'ADD' | 'REMOVE'
+  name: string
+  businessDate: string
+  changedBy: string
+  changedAt: string
 }
 
 /** 직원 역할·팀 변경 (R71) */

@@ -46,6 +46,7 @@ export const SCREENS: Record<string, Screen> = {
   '/admin': { label: '운영 관리', permission: 'admin.manage' },
   '/admin/menus': { label: '메뉴 관리', permission: 'admin.manage' },
   '/admin/permissions': { label: '권한 관리', permission: 'admin.manage' },
+  '/admin/holidays': { label: '휴일 관리', permission: 'admin.manage' },
   '/message-templates': { label: '문자 템플릿', permission: 'admin.manage' },
   '/credit-reports': { label: '신용정보 보고', permission: 'admin.manage' },
   '/account': { label: '내 계정' },
@@ -61,7 +62,7 @@ export interface MenuGroupInput {
   items: { path: string; label: string }[]
 }
 
-/** 처음 설치했을 때의 메뉴 (V18 시드와 같음) */
+/** 처음 설치했을 때의 메뉴 (V18·V22 시드와 같음) */
 export const DEFAULT_MENU: MenuGroupInput[] = [
   {
     label: '대출신청관리',
@@ -76,9 +77,16 @@ export const DEFAULT_MENU: MenuGroupInput[] = [
   { label: '보고서', items: ['/reports'].map(seed) },
   {
     label: '시스템설정',
-    items: ['/admin', '/admin/menus', '/admin/permissions', '/message-templates', '/credit-reports', '/account'].map(
-      seed,
-    ),
+    // '/admin/holidays'는 V22에서 그룹 끝에 붙였으므로 여기서도 끝에 둔다
+    items: [
+      '/admin',
+      '/admin/menus',
+      '/admin/permissions',
+      '/message-templates',
+      '/credit-reports',
+      '/account',
+      '/admin/holidays',
+    ].map(seed),
   },
 ]
 
