@@ -165,7 +165,12 @@ export function UnmatchedPage() {
               <TD>{d.depositorName ?? '-'}</TD>
               <TD className="text-muted-foreground">{d.bankTxId}</TD>
               <TD>
-                <MatchDialog deposit={d} />
+                <div className="flex gap-1">
+                  <MatchDialog deposit={d} />
+                  <Button asChild size="sm" variant="outline">
+                    <Link to={`/payment-splits?unmatchedId=${d.id}&amount=${d.amount}`}>여러 계약에 배분</Link>
+                  </Button>
+                </div>
               </TD>
             </TR>
           ))}

@@ -31,6 +31,8 @@ interface LoanAccountRepository extends JpaRepository<LoanAccount, Long> {
 
 	List<LoanAccount> findByPaidOffOn(LocalDate paidOffOn);
 
+	List<LoanAccount> findByCustomerIdOrderById(long customerId);
+
 	List<LoanAccount> findTop50ByAccountNoContainingOrderByIdDesc(String accountNo);
 
 	List<LoanAccount> findTop50ByCustomerIdInOrderByIdDesc(Collection<Long> customerIds);

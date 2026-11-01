@@ -29,6 +29,9 @@ class LimitationEvent extends BaseEntity {
 	private Type type;
 	private LocalDate eventDate;
 	private String memo;
+	/** 법조치 취하·각하 등으로 중단 효력이 없어진 날 (R51). 행은 지우지 않는다 */
+	private LocalDate voidedOn;
+	private String voidReason;
 
 	protected LimitationEvent() {
 	}
@@ -42,6 +45,23 @@ class LimitationEvent extends BaseEntity {
 
 	Type type() {
 		return type;
+	}
+
+	long accountId() {
+		return accountId;
+	}
+
+	void voidOn(LocalDate on, String reason) {
+		this.voidedOn = on;
+		this.voidReason = reason;
+	}
+
+	boolean voided() {
+		return voidedOn != null;
+	}
+
+	String voidReason() {
+		return voidReason;
 	}
 
 	LocalDate eventDate() {

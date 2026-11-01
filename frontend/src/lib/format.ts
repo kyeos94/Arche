@@ -99,6 +99,51 @@ export const statusLabels: Record<string, string> = {
   DELINQUENCY_30: '연체 안내 (30일째)',
   PAYOFF: '완제 안내',
   PROMISE_REMINDER: '약속 납부 안내',
+  SPLIT: '일괄배분',
+  CUSTOMER: '본인',
+  GUARANTOR: '보증인',
+  THIRD_PARTY: '제3자',
+  OLDEST_DELINQUENCY_FIRST: '연체 우선',
+  PROPORTIONAL: '잔액 비례',
+  MANUAL: '수동 지정',
+  BANK_TRANSFER: '계좌이체',
+  VIRTUAL_ACCOUNT: '가상계좌',
+  AUTO_DEBIT: '자동이체',
+  CASH: '현금',
+  AUCTION_DISTRIBUTION: '경매 배당금',
+  COURT_DEPOSIT: '공탁금 출급',
+}
+
+/** 법조치 종류·단계·비용 (R51·R52). 계약 상태 SOLD(매각)와 겹쳐 따로 둔다 */
+export const legalLabels: Record<string, string> = {
+  PAYMENT_ORDER: '지급명령',
+  SEIZURE: '압류',
+  AUCTION: '경매',
+  FILED: '신청',
+  ISSUED: '발령',
+  SERVED: '송달',
+  OBJECTED: '이의신청',
+  CONFIRMED: '확정',
+  ORDERED: '압류 결정',
+  COLLECTED: '회수',
+  COMMENCED: '개시 결정',
+  SALE_SCHEDULED: '매각기일',
+  SOLD: '매각 허가',
+  DISTRIBUTED: '배당',
+  CLOSED: '종결',
+  WITHDRAWN: '취하',
+  DISMISSED: '각하·기각',
+  RELEASED: '압류 해제',
+  COURT_FEE: '인지대 등',
+  SERVICE_FEE: '송달료',
+  EXECUTION_FEE: '집행·감정 수수료',
+  AGENT_FEE: '대리인 비용',
+  OTHER: '기타',
+}
+
+export function legalLabel(code: string | null | undefined): string {
+  if (!code) return '-'
+  return legalLabels[code] ?? code
 }
 
 export function statusLabel(code: string | null | undefined): string {

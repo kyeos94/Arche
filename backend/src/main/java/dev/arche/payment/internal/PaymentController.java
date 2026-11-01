@@ -1,6 +1,7 @@
 package dev.arche.payment.internal;
 
 import dev.arche.calendar.BusinessDates;
+import dev.arche.payment.LegalActionLink;
 import dev.arche.common.BusinessException;
 import dev.arche.common.Money;
 import dev.arche.payment.Payments;
@@ -33,7 +34,12 @@ class PaymentController {
 
 	record RegisterRequest(Long accountId, String accountNo, @NotNull LocalDate bankDate, @Positive long amount,
 			String depositorName, String bankTxId, Payments.Channel channel, Boolean prepayment,
-			Long prepaymentPrincipal) {
+			Long prepaymentPrincipal, PayerType payerType, String payerName, String payerRef, Long legalActionId) {
+
+		@Override
+		public String toString() {
+			return "RegisterRequest[accountId=" + accountId + ", amount=" + amount + ", payerType=" + payerType + "]";
+		}
 	}
 
 	record MatchRequest(Long accountId, String accountNo) {
@@ -47,7 +53,8 @@ class PaymentController {
 	}
 
 	record UnmatchedDto(long id, long paymentId, String status, LocalDate valueDate, LocalDate businessDate,
-			long amount, String depositorName, String bankTxId, Long matchedAccountId, OffsetDateTime matchedAt) {
+			long amount, String depositorName, String bankTxId, Long matchedAccountId, OffsetDateTime matchedAt,
+			String channel, String payerType, String payerNameMasked) {
 	}
 
 	record CorrectionDto(long id, String correctionNo, String type, long originalPaymentId, Long newPaymentId,
@@ -62,7 +69,16 @@ class PaymentController {
 
 	record PaymentRow(long id, Long accountId, String channel, LocalDate valueDate, LocalDate businessDate,
 			long amount, String depositorName, String bankTxId, String status, Long processedBy,
-			boolean cancellableToday) {
+			boolean cancellableToday, String payerType, String payerNameMasked, String payerRef,
+			Long parentPaymentId, String splitMethod, Long legalActionId) {
+
+		static PaymentRow of(Payment p, LocalDate today) {
+			Payer payer = p.payer();
+			return new PaymentRow(p.getId(), p.accountId(), p.channel().name(), p.valueDate(), p.businessDate(),
+					p.amount().won(), p.depositorName(), p.bankTxId(), p.status().name(), p.processedBy(),
+					p.businessDate().equals(today), payer.type().name(), Payer.mask(payer.name()), payer.ref(),
+					p.parentPaymentId(), p.splitMethod() == null ? null : p.splitMethod().name(), p.legalActionId());
+		}
 	}
 
 	private final PaymentService service;
@@ -72,10 +88,11 @@ class PaymentController {
 	private final LoanAccounts accounts;
 	private final BusinessDates businessDates;
 	private final StaffDirectory staff;
+	private final LegalActionLink legalActions;
 
 	PaymentController(PaymentService service, PaymentRepository payments, UnmatchedDepositRepository unmatched,
 			PaymentCorrectionRepository corrections, LoanAccounts accounts, BusinessDates businessDates,
-			StaffDirectory staff) {
+			StaffDirectory staff, LegalActionLink legalActions) {
 		this.service = service;
 		this.payments = payments;
 		this.unmatched = unmatched;
@@ -83,36 +100,49 @@ class PaymentController {
 		this.accounts = accounts;
 		this.businessDates = businessDates;
 		this.staff = staff;
+		this.legalActions = legalActions;
 	}
 
 	@PostMapping("/payments")
 	@PreAuthorize("hasAuthority('payment.register')")
 	Payments.PaymentView register(@Valid @RequestBody RegisterRequest body) {
 		Long accountId = resolve(body.accountId(), body.accountNo(), true);
+		if (body.legalActionId() != null) {
+			// 배당금·공탁금은 그 법조치의 계약에 입금 (R52)
+			long actionAccount = legalActions.accountIdOf(body.legalActionId())
+					.orElseThrow(() -> new BusinessException("LEGAL_ACTION_NOT_FOUND", "법조치가 없습니다"));
+			if (accountId == null) {
+				accountId = actionAccount;
+			} else if (accountId != actionAccount) {
+				throw new BusinessException("LEGAL_ACTION_INVALID", "다른 계약의 법조치입니다");
+			}
+		}
 		LoanAccounts.PrepaymentOption prepay = Boolean.TRUE.equals(body.prepayment())
 				? new LoanAccounts.PrepaymentOption(
 						body.prepaymentPrincipal() == null ? null : Money.won(body.prepaymentPrincipal()))
 				: null;
 		String txId = body.bankTxId() == null || body.bankTxId().isBlank() ? PaymentService.manualTxId()
 				: body.bankTxId();
-		return service.register(new Payments.Deposit(accountId,
-				body.channel() == null ? Payments.Channel.BANK_TRANSFER : body.channel(), body.bankDate(),
-				Money.won(body.amount()), body.depositorName(), txId), prepay);
+		Payments.Channel channel = body.channel() == null ? Payments.Channel.BANK_TRANSFER : body.channel();
+		return service.register(new Payments.Deposit(accountId, channel, body.bankDate(), Money.won(body.amount()),
+				body.depositorName(), txId), prepay, Payer.of(body.payerType(), body.payerName(), body.payerRef()),
+				body.legalActionId());
 	}
 
 	@GetMapping("/payments")
 	@PreAuthorize("hasAuthority('loan.read') or hasAuthority('payment.register')")
 	@Transactional(readOnly = true)
 	List<PaymentRow> list(@RequestParam(required = false) Long accountId,
-			@RequestParam(required = false) String status, @RequestParam(required = false) LocalDate date) {
+			@RequestParam(required = false) String status, @RequestParam(required = false) LocalDate date,
+			@RequestParam(required = false) Long parentPaymentId, @RequestParam(required = false) Long legalActionId) {
 		LocalDate today = businessDates.today();
 		List<Payment> rows = accountId != null ? payments.findByAccountIdOrderByIdDesc(accountId)
-				: payments.findTop500ByOrderByIdDesc().stream()
-						.filter(p -> status == null || p.status().name().equals(status))
-						.filter(p -> date == null || p.businessDate().equals(date)).toList();
-		return rows.stream().map(p -> new PaymentRow(p.getId(), p.accountId(), p.channel().name(), p.valueDate(),
-				p.businessDate(), p.amount().won(), p.depositorName(), p.bankTxId(), p.status().name(),
-				p.processedBy(), p.businessDate().equals(today))).toList();
+				: parentPaymentId != null ? payments.findByParentPaymentIdOrderById(parentPaymentId)
+						: legalActionId != null ? payments.findByLegalActionIdOrderById(legalActionId)
+								: payments.findTop500ByOrderByIdDesc().stream()
+										.filter(p -> status == null || p.status().name().equals(status))
+										.filter(p -> date == null || p.businessDate().equals(date)).toList();
+		return rows.stream().map(p -> PaymentRow.of(p, today)).toList();
 	}
 
 	@GetMapping("/unmatched-deposits")
@@ -122,7 +152,8 @@ class PaymentController {
 		return unmatched.findByStatusOrderByIdDesc(UnmatchedDeposit.Status.valueOf(status)).stream().map(u -> {
 			Payment p = payments.findById(u.paymentId()).orElseThrow();
 			return new UnmatchedDto(u.getId(), p.getId(), u.status().name(), p.valueDate(), p.businessDate(),
-					p.amount().won(), p.depositorName(), p.bankTxId(), u.matchedAccountId(), u.matchedAt());
+					p.amount().won(), p.depositorName(), p.bankTxId(), u.matchedAccountId(), u.matchedAt(),
+					p.channel().name(), p.payer().type().name(), Payer.mask(p.payer().name()));
 		}).toList();
 	}
 

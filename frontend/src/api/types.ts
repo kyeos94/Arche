@@ -353,6 +353,92 @@ export interface PaymentView {
 export interface PaymentRow extends PaymentView {
   processedBy: number | null
   cancellableToday: boolean
+  /** 입금자 구분 (R49) */
+  payerType: PayerType
+  payerNameMasked: string | null
+  payerRef: string | null
+  /** 일괄 배분의 하위 입금이면 원 입금 id (R48) */
+  parentPaymentId: number | null
+  splitMethod: SplitMethod | null
+  legalActionId: number | null
+}
+
+export type PayerType = 'CUSTOMER' | 'GUARANTOR' | 'THIRD_PARTY'
+
+export type SplitMethod = 'OLDEST_DELINQUENCY_FIRST' | 'PROPORTIONAL' | 'MANUAL'
+
+/** 일괄 입금 배분 대상 계약 (R47) */
+export interface SplitTarget {
+  accountId: number
+  accountNo: string
+  productCode: string
+  status: string
+  disbursedOn: string
+  delinquentSince: string | null
+  nextDueDate: string | null
+  overdue: number
+  nextDue: number
+  payoff: number
+}
+
+export interface SplitTargets {
+  customerId: number
+  customerNo: string
+  customerName: string
+  businessDate: string
+  accounts: SplitTarget[]
+}
+
+export interface SplitPart {
+  accountId: number
+  accountNo: string
+  amount: number
+}
+
+export interface SplitResult {
+  parent: PaymentView
+  parts: PaymentView[]
+}
+
+/** 대위변제 기록 (R49) */
+export interface SubrogationClaim {
+  id: number
+  paymentId: number
+  accountId: number
+  payerType: PayerType
+  payerNameMasked: string
+  payerRef: string | null
+  valueDate: string
+  amount: number
+  status: string
+  recordedOn: string
+  cancelledOn: string | null
+  cancelReason: string | null
+}
+
+export type LegalActionType = 'PAYMENT_ORDER' | 'SEIZURE' | 'AUCTION'
+
+export type LegalCostType = 'COURT_FEE' | 'SERVICE_FEE' | 'EXECUTION_FEE' | 'AGENT_FEE' | 'OTHER'
+
+/** 법조치 (R51·R52) */
+export interface LegalAction {
+  id: number
+  actionNo: string
+  accountId: number
+  accountNo: string
+  type: LegalActionType
+  status: string
+  courtName: string | null
+  caseRef: string | null
+  targetDesc: string | null
+  claimAmount: number | null
+  filedOn: string
+  closedOn: string | null
+  memo: string | null
+  totalCost: number
+  nextStages: string[]
+  stages: { id: number; stage: string; date: string; memo: string | null; limitationEventId: number | null; createdBy: string }[]
+  costs: { id: number; costType: LegalCostType; amount: number; incurredOn: string; chargedOn: string; memo: string | null }[]
 }
 
 export interface UnmatchedDeposit {
@@ -366,6 +452,9 @@ export interface UnmatchedDeposit {
   bankTxId: string
   matchedAccountId: number | null
   matchedAt: string | null
+  channel: string
+  payerType: PayerType
+  payerNameMasked: string | null
 }
 
 export type CorrectionType = 'CANCEL' | 'MOVE' | 'AMOUNT_FIX'

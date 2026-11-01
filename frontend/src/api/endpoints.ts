@@ -34,6 +34,15 @@ import type {
   Schedule,
   StaffRow,
   UnmatchedDeposit,
+  LegalAction,
+  LegalActionType,
+  LegalCostType,
+  PayerType,
+  SplitMethod,
+  SplitPart,
+  SplitResult,
+  SplitTargets,
+  SubrogationClaim,
 } from './types'
 
 /** TanStack Query 키 — 계약 하나의 모든 쿼리는 ['loan', id]로 시작해 한 번에 무효화할 수 있다 */
@@ -67,6 +76,10 @@ export const queryKeys = {
   reportMonths: ['reports', 'months'] as const,
   reportRollRate: (month: string) => ['reports', 'roll-rate', month] as const,
   reportProvision: (month: string) => ['reports', 'provision', month] as const,
+  splitTargets: (accountNo: string) => ['split-targets', accountNo] as const,
+  loanSubrogations: (id: number) => ['loan', id, 'subrogations'] as const,
+  loanLegalActions: (id: number) => ['loan', id, 'legal-actions'] as const,
+  legalActions: (openOnly: boolean) => ['legal-actions', openOnly] as const,
 }
 
 export interface LoanSearch {
@@ -86,6 +99,37 @@ export interface PaymentRequest {
   channel?: string
   prepayment?: boolean
   prepaymentPrincipal?: number | null
+  /** 입금자 구분 (R49) */
+  payerType?: PayerType
+  payerName?: string
+  payerRef?: string
+  /** 배당금·공탁금 입금을 연결할 법조치 (R52) */
+  legalActionId?: number | null
+}
+
+export interface SplitRequest {
+  customerId: number
+  method: SplitMethod
+  manual?: { accountId: number; amount: number }[]
+  /** 미확인 입금을 나눌 때 */
+  unmatchedId?: number
+  bankDate?: string
+  amount?: number
+  depositorName?: string
+  bankTxId?: string
+  payerType?: PayerType
+  payerName?: string
+  payerRef?: string
+}
+
+export interface LegalActionRequest {
+  type: LegalActionType
+  filedOn: string
+  courtName?: string
+  caseRef?: string
+  targetDesc?: string
+  claimAmount?: number | null
+  memo?: string
 }
 
 export interface CorrectionRequest {
@@ -205,4 +249,22 @@ export const endpoints = {
     downloadXlsx('/api/exports/loans', body, 'loans.xlsx'),
   exportReport: (body: { kind: ReportKind; date?: string; month?: string; reason: string }) =>
     downloadXlsx('/api/exports/reports', body, 'report.xlsx'),
+  // 일괄 입금 배분 (R47·R48)·대위변제 (R49)
+  splitTargets: (accountNo: string) => api.get<SplitTargets>(`/api/payment-splits/targets${qs({ accountNo })}`),
+  previewSplit: (body: { customerId: number; method: SplitMethod; amount: number; manual?: SplitRequest['manual'] }) =>
+    api.post<SplitPart[]>('/api/payment-splits/preview', body),
+  split: (body: SplitRequest) => api.post<SplitResult>('/api/payment-splits', body),
+  subrogations: (accountId: number) => api.get<SubrogationClaim[]>(`/api/subrogations${qs({ accountId })}`),
+
+  // 법조치 (R51·R52)
+  loanLegalActions: (id: number) => api.get<LegalAction[]>(`/api/loans/${id}/legal-actions`),
+  openLegalAction: (id: number, body: LegalActionRequest) =>
+    api.post<LegalAction>(`/api/loans/${id}/legal-actions`, body),
+  moveLegalAction: (actionId: number, body: { stage: string; date: string; memo?: string }) =>
+    api.post<LegalAction>(`/api/legal-actions/${actionId}/stages`, body),
+  chargeLegalCost: (
+    actionId: number,
+    body: { costType: LegalCostType; amount: number; incurredOn: string; memo?: string },
+  ) => api.post<LegalAction>(`/api/legal-actions/${actionId}/costs`, body),
+  legalActions: (openOnly: boolean) => api.get<LegalAction[]>(`/api/legal-actions${qs({ openOnly })}`),
 }

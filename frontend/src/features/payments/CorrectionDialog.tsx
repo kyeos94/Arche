@@ -34,10 +34,13 @@ export function CorrectionDialog({
   loanId,
   payment,
   type,
+  groupParentId,
 }: {
   loanId: number
   payment: PaymentRow
   type: CorrectionType
+  /** 일괄 배분 하위 입금이면 원 입금 id: 원 입금 단위 전체 취소 (R48) */
+  groupParentId?: number
 }) {
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<Correction | null>(null)
@@ -50,7 +53,7 @@ export function CorrectionDialog({
     mutationFn: (v: CorrectionForm) =>
       endpoints.requestCorrection({
         type: v.type,
-        paymentId: payment.id,
+        paymentId: groupParentId ?? payment.id,
         targetAccountNo: v.type === 'MOVE' ? v.targetAccountNo?.trim() : undefined,
         correctedAmount:
           v.type === 'AMOUNT_FIX' ? Number((v.correctedAmount ?? '').replace(/[^0-9]/g, '')) : undefined,
@@ -62,7 +65,13 @@ export function CorrectionDialog({
       if (c.targetAccountId) await invalidate(c.targetAccountId)
     },
   })
-  const t = titles[type]
+  const t = groupParentId
+    ? {
+        button: '배분 전체 취소',
+        title: '일괄 배분 전체 취소',
+        description: `원 입금 #${groupParentId}로 나눈 모든 계약의 충당을 취소하고 원 입금 전액을 미확인 입금으로 돌립니다. 하위 입금만 따로 취소할 수는 없습니다 (R48).`,
+      }
+    : titles[type]
   const errors = form.formState.errors
 
   return (

@@ -95,4 +95,37 @@ public interface LoanAccounts {
 	java.util.List<MessagingView> messagingViews(LocalDate paidOffOn);
 
 	MessagingView messagingView(long accountId);
+
+	// ------------------------------------------------------------------ 입금 배분·대위변제·법조치 (R47~R52)
+
+	/**
+	 * 일괄 입금 배분 기준 금액 (R47). 업무일자로 재생한 값이며 락 없이 계산한 추정치다 (실제 충당은 applyPayment가 락 안에서 다시 계산).
+	 *
+	 * @param overdue 지금 갚아야 할 연체금. 기한이익상실·만기 경과·매입채권은 완제 금액
+	 * @param nextDue 다음 약정일 예정액 (남은 원금 + 계획 이자)
+	 */
+	record DueSnapshot(long accountId, String accountNo, long customerId, String productCode, String status,
+			@Nullable Long assignedStaffId, LocalDate disbursedOn, @Nullable LocalDate delinquentSince,
+			@Nullable LocalDate nextDueDate, Money overdue, Money nextDue, Money payoff) {
+	}
+
+	/** 고객의 완제 전 계약 (계약 id 순) */
+	java.util.List<DueSnapshot> customerAccounts(long customerId);
+
+	/** 비용 적재 (법조치 비용 등, guide 6.5). 업무일자에 COST 이벤트로 기록하고 재생한다. 완제 계약은 불가 */
+	AccountRef chargeCost(long accountId, Money amount, String reason);
+
+	/** 소멸시효 중단·연장 사유 (정책서 5장) */
+	enum LegalEventType {
+		PAYMENT_ORDER_FILED, SEIZURE, JUDGMENT_CONFIRMED
+	}
+
+	/** 소멸시효 중단 사유 기록. 기록 id를 돌려준다 (법조치 단계와 연결, R51) */
+	long recordLimitationEvent(long accountId, LegalEventType type, LocalDate date, @Nullable String memo);
+
+	/** 법조치 취하·각하 등으로 중단 효력이 없어진 사유를 무효로 표시 (행은 남김, R51) */
+	void voidLimitationEvent(long accountId, long limitationEventId, LocalDate on, String reason);
+
+	/** 채무자의 승인이 아닌 입금(보증인·제3자·법원 배당 등)은 소멸시효 중단 사유로 세지 않음 (R50) */
+	void excludeFromLimitation(long accountId, long paymentId);
 }

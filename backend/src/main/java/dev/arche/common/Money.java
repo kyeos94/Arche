@@ -35,6 +35,17 @@ public record Money(long won) implements Comparable<Money> {
 		return won >= other.won ? this : other;
 	}
 
+	/**
+	 * 비례 배분 몫: 이 금액 × numerator ÷ denominator, 원 미만 절사 (R47 잔액 비례 배분).
+	 */
+	public Money share(long numerator, long denominator) {
+		if (denominator <= 0 || numerator < 0) {
+			throw new IllegalArgumentException("배분 비율이 올바르지 않습니다");
+		}
+		return floor(toBigDecimal().multiply(BigDecimal.valueOf(numerator))
+				.divide(BigDecimal.valueOf(denominator), 0, RoundingMode.DOWN));
+	}
+
 	public boolean isZero() {
 		return won == 0;
 	}

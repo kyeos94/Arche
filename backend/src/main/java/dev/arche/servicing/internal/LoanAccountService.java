@@ -12,6 +12,7 @@ import dev.arche.servicing.AccountRef;
 import dev.arche.servicing.LoanAccounts;
 import dev.arche.servicing.engine.AccountStatus;
 import dev.arche.servicing.engine.ScheduleMath;
+import dev.arche.servicing.engine.SimulationResult;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -335,8 +336,9 @@ class LoanAccountService implements LoanAccounts {
 		return a.asOf() != null && a.asOf().isAfter(today) ? a.asOf() : today;
 	}
 
+	@Override
 	@Transactional
-	AccountRef chargeCost(long accountId, Money amount, String reason) {
+	public AccountRef chargeCost(long accountId, Money amount, String reason) {
 		LoanAccount a = lock(accountId);
 		requireChangeable(a);
 		events.save(AccountEvent.cost(accountId, businessDates.today(), amount, reason));
@@ -442,6 +444,75 @@ class LoanAccountService implements LoanAccounts {
 	@Transactional(readOnly = true)
 	public Money correctionsPostedOn(LocalDate businessDate) {
 		return Money.won(ledger.sumCorrectionsPostedOn(businessDate));
+	}
+
+	// ------------------------------------------------------------------ 입금 배분·대위변제·법조치 (R47~R52)
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<DueSnapshot> customerAccounts(long customerId) {
+		LocalDate today = businessDates.today();
+		List<DueSnapshot> result = new java.util.ArrayList<>();
+		for (LoanAccount a : accounts.findByCustomerIdOrderById(customerId)) {
+			if (a.status() == AccountStatus.PAID_OFF) {
+				continue;
+			}
+			SimulationResult r = replayer.simulate(a, replayer.terms(a), List.of(), today);
+			if (r.status() == AccountStatus.PAID_OFF) {
+				continue;
+			}
+			result.add(dueSnapshot(a, r, today));
+		}
+		return result;
+	}
+
+	/** R47 연체금: 기한이익상실·만기 경과·매입채권은 완제 금액, 연체 중이면 비용 + 미납 이자 + 납부 기한이 지난 원금 − 가수금 */
+	static DueSnapshot dueSnapshot(LoanAccount a, SimulationResult r, LocalDate today) {
+		Money payoff = r.payoffAmount();
+		boolean dueAll = r.status() == AccountStatus.ACCELERATED
+				|| a.repaymentMethod() == dev.arche.common.RepaymentMethod.ACQUIRED
+				|| (r.maturityDate() != null && today.isAfter(r.maturityDate()));
+		Money overdue;
+		if (dueAll) {
+			overdue = payoff;
+		} else {
+			Money overduePrincipal = r.installments().stream()
+					.filter(i -> i.status() == dev.arche.servicing.engine.InstallmentStatus.OVERDUE)
+					.map(i -> i.principalDue().minus(i.principalPaid())).reduce(Money.ZERO, Money::plus);
+			Money due = r.delinquentSince() == null ? r.cost()
+					: r.cost().plus(r.outstandingLateInterest()).plus(r.outstandingNormalInterest())
+							.plus(overduePrincipal);
+			overdue = due.minus(r.suspense()).max(Money.ZERO).min(payoff);
+		}
+		var next = r.nextInstallment()
+				.filter(i -> i.status() != dev.arche.servicing.engine.InstallmentStatus.OVERDUE).orElse(null);
+		Money nextDue = next == null ? Money.ZERO
+				: next.principalDue().minus(next.principalPaid()).plus(next.plannedInterest()).max(Money.ZERO);
+		return new DueSnapshot(a.getId(), a.accountNo(), a.customerId(), a.productCode(), r.status().name(),
+				a.assignedStaffId(), a.disbursedOn(), r.delinquentSince(), next == null ? null : next.dueDate(),
+				overdue, nextDue, payoff);
+	}
+
+	@Override
+	@Transactional
+	public long recordLimitationEvent(long accountId, LegalEventType type, LocalDate date, @Nullable String memo) {
+		find(accountId);
+		return limitationService.record(accountId, LimitationEvent.Type.valueOf(type.name()), date, memo);
+	}
+
+	@Override
+	@Transactional
+	public void voidLimitationEvent(long accountId, long limitationEventId, LocalDate on, String reason) {
+		limitationService.voidEvent(accountId, limitationEventId, on, reason);
+	}
+
+	@Override
+	@Transactional
+	public void excludeFromLimitation(long accountId, long paymentId) {
+		AccountEvent e = events.findByPaymentIdAndTypeAndStatus(paymentId, AccountEvent.Type.PAYMENT, "ACTIVE")
+				.filter(x -> x.accountId() == accountId)
+				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_APPLIED", "이 계약에 충당된 입금이 아닙니다"));
+		e.excludeFromLimitation();
 	}
 
 	// ------------------------------------------------------------------ 공통
