@@ -52,3 +52,6 @@ arche:
     enabled: true
   closing:
     cron: "0 0 23 * * *"
+    # 기동 시 업무일자가 오늘보다 늦으면 밀린 일마감을 하루씩 처리해 오늘로 맞춘다.
+    # 데모를 2026-06-12(golden 사례 G11·G27·G28 재현 시점)에 고정하려면 false
+    catch-up: ${ARCHE_CATCH_UP:true}

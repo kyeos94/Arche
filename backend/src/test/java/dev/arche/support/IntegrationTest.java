@@ -34,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
  * 컨텍스트와 컨테이너는 테스트 클래스 사이에서 공유하므로, 각 테스트는 자기 고객·계약을 새로 만들고 업무일자를 명시적으로 정한다.
  */
 @Tag("integration")
-@SpringBootTest(properties = { "arche.demo.enabled=false", "arche.scheduling.enabled=false" })
+@SpringBootTest(properties = { "arche.demo.enabled=false", "arche.scheduling.enabled=false",
+		"arche.closing.catch-up=false" })
 @AutoConfigureMockMvc
 @Import(IntegrationTest.Containers.class)
 public abstract class IntegrationTest {
