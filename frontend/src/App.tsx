@@ -12,6 +12,9 @@ import { NewLoanPage } from '@/features/loans/NewLoanPage'
 import { CorrectionsPage } from '@/features/payments/CorrectionsPage'
 import { SplitPage } from '@/features/payments/SplitPage'
 import { LegalActionsPage } from '@/features/collection/LegalActionsPage'
+import { TemplatesPage } from '@/features/communication/TemplatesPage'
+import { CreditReportsPage } from '@/features/creditinfo/CreditReportsPage'
+import { WithdrawalsPage } from '@/features/treasury/WithdrawalsPage'
 import { UnmatchedPage } from '@/features/payments/UnmatchedPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +40,9 @@ export function App() {
         <Route path="bulk" element={<BulkPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="withdrawals" element={<WithdrawalsPage />} />
+        <Route path="message-templates" element={<TemplatesPage />} />
+        <Route path="credit-reports" element={<CreditReportsPage />} />
         <Route
           path="account"
           element={

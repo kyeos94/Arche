@@ -9,7 +9,7 @@ import { formatDate } from '@/lib/format'
 import { THEME_LABEL, THEME_ORDER, setPreferences, usePreferences } from '@/lib/preferences'
 import { cn } from '@/lib/utils'
 
-const nav: { to: string; label: string; permission?: string }[] = [
+const nav: { to: string; label: string; permission?: string; anyOf?: string[] }[] = [
   { to: '/loans', label: '계약 목록', permission: 'loan.read' },
   { to: '/loans/new', label: '계약 등록', permission: 'loan.create' },
   { to: '/alerts', label: '추심 알림', permission: 'loan.read' },
@@ -19,7 +19,14 @@ const nav: { to: string; label: string; permission?: string }[] = [
   { to: '/corrections', label: '정정 승인', permission: 'payment.cancel.closed.approve' },
   { to: '/bulk', label: '입금 일괄 등록', permission: 'payment.register' },
   { to: '/reports', label: '보고서', permission: 'report.read' },
+  {
+    to: '/withdrawals',
+    label: '출금 작성·승인',
+    anyOf: ['withdrawal.create', 'withdrawal.approve.small', 'withdrawal.approve.large'],
+  },
   { to: '/admin', label: '운영 관리', permission: 'admin.manage' },
+  { to: '/message-templates', label: '문자 템플릿', permission: 'admin.manage' },
+  { to: '/credit-reports', label: '신용정보 보고', permission: 'admin.manage' },
   { to: '/account', label: '내 계정' },
 ]
 
@@ -29,7 +36,9 @@ export function Layout() {
   const { data: bd } = useQuery({ queryKey: queryKeys.businessDate, queryFn: endpoints.businessDate })
   const prefs = usePreferences()
   const top = prefs.nav === 'top'
-  const items = nav.filter((n) => !n.permission || can(n.permission))
+  const items = nav.filter(
+    (n) => (!n.permission || can(n.permission)) && (!n.anyOf || n.anyOf.some((p) => can(p))),
+  )
   const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(prefs.theme) + 1) % THEME_ORDER.length]
 
   const links = items.map((n) => (

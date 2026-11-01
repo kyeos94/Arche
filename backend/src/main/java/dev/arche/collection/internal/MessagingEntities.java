@@ -190,4 +190,8 @@ class OutboundMessage extends BaseEntity {
 	OffsetDateTime sentAt() {
 		return sentAt;
 	}
+
+	Long contactLogId() {
+		return contactLogId;
+	}
 }
