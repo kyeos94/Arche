@@ -21,7 +21,12 @@ class DocumentRulesTest {
 
 	private static DocumentView view(String status, LocalDate delinquentSince, long overdue, String noticeStatus,
 			LocalDate acceleratedOn) {
-		return new DocumentView(1, "L00000001", 10, "P1", status, LocalDate.of(2026, 1, 10), Money.won(10_000_000),
+		return view(status, delinquentSince, overdue, noticeStatus, acceleratedOn, false);
+	}
+
+	private static DocumentView view(String status, LocalDate delinquentSince, long overdue, String noticeStatus,
+			LocalDate acceleratedOn, boolean acquired) {
+		return new DocumentView(1, "L00000001", 10, acquired ? "N1" : "P1", acquired, status, LocalDate.of(2026, 1, 10), Money.won(10_000_000),
 				InterestRate.of("19.9"), Money.won(9_000_000), Money.won(700_000), Money.won(150_000),
 				Money.won(3_210), Money.ZERO, Money.ZERO, Money.won(overdue), Money.won(9_200_000), delinquentSince,
 				delinquentSince == null ? 0 : 20, 1, delinquentSince, null, acceleratedOn, noticeStatus,
@@ -71,27 +76,39 @@ class DocumentRulesTest {
 
 	@Test
 	void 독촉장은_연체나_상실_계약만() {
-		assertThat(DocumentService.notTarget("DEMAND", view("NORMAL", null, 0, null, null)))
+		assertThat(PrintDocumentService.notTarget("DEMAND", view("NORMAL", null, 0, null, null)))
 				.contains("연체 중이 아닙니다");
-		assertThat(DocumentService.notTarget("DEMAND", view("DELINQUENT", LocalDate.of(2026, 10, 10), 853_210, null,
+		assertThat(PrintDocumentService.notTarget("DEMAND", view("DELINQUENT", LocalDate.of(2026, 10, 10), 853_210, null,
 				null))).isEmpty();
-		assertThat(DocumentService.notTarget("DEMAND", view("ACCELERATED", null, 9_200_000, "EXECUTED",
+		assertThat(PrintDocumentService.notTarget("DEMAND", view("ACCELERATED", null, 9_200_000, "EXECUTED",
 				LocalDate.of(2026, 10, 28)))).isEmpty();
-		assertThat(DocumentService.notTarget("DEMAND", view("PAID_OFF", null, 0, null, null)))
+		assertThat(PrintDocumentService.notTarget("DEMAND", view("PAID_OFF", null, 0, null, null)))
 				.contains("완제된 계약입니다");
-		assertThat(DocumentService.notTarget("DEMAND", view("SOLD", LocalDate.of(2026, 10, 10), 1, null, null)))
+		assertThat(PrintDocumentService.notTarget("DEMAND", view("SOLD", LocalDate.of(2026, 10, 10), 1, null, null)))
 				.hasValueSatisfying(r -> assertThat(r).contains("매각"));
 	}
 
 	@Test
 	void 통보서는_통지가_진행_중이거나_상실된_계약만() {
-		assertThat(DocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1, null,
+		assertThat(PrintDocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1, null,
 				null))).hasValueSatisfying(r -> assertThat(r).contains("통지 대상이 아닙니다"));
-		assertThat(DocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1,
+		assertThat(PrintDocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1,
 				"PENDING", null))).isEmpty();
-		assertThat(DocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1,
+		assertThat(PrintDocumentService.notTarget("ACCELERATION", view("DELINQUENT", LocalDate.of(2026, 10, 10), 1,
 				"CANCELLED", null))).isPresent();
-		assertThat(DocumentService.notTarget("ACCELERATION", view("CHARGED_OFF", null, 1, null,
+		assertThat(PrintDocumentService.notTarget("ACCELERATION", view("CHARGED_OFF", null, 1, null,
 				LocalDate.of(2026, 8, 6)))).isEmpty();
+	}
+
+	@Test
+	void 매입채권은_통보서_대상이_아니고_독촉장의_연체일은_상실일부터() {
+		DocumentView npl = view("ACCELERATED", null, 3_595_890, null, LocalDate.of(2026, 4, 15), true);
+		assertThat(PrintDocumentService.notTarget("ACCELERATION", npl))
+				.hasValueSatisfying(r -> assertThat(r).contains("매입채권"));
+		assertThat(PrintDocumentService.notTarget("DEMAND", npl)).isEmpty();
+		Map<String, String> v = DocumentPlaceholders.values(npl, "a", "b", "c", "d",
+				new DocumentPlaceholders.Company("n", "a", "p", "r"), "1", TODAY);
+		assertThat(v.get("연체시작일")).isEqualTo("2026년 4월 15일");
+		assertThat(v.get("연체일수")).isEqualTo("201");
 	}
 }

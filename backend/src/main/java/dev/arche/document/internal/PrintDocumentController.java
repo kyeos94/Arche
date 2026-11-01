@@ -13,36 +13,36 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/documents")
 @PreAuthorize("hasAuthority('loan.read') and hasAuthority('document.print')")
-class DocumentController {
+class PrintDocumentController {
 
-	record RenderRequest(String templateCode, List<Long> accountIds, DocumentService.Purpose purpose) {
+	record RenderRequest(String templateCode, List<Long> accountIds, PrintDocumentService.Purpose purpose) {
 	}
 
-	private final DocumentService documents;
+	private final PrintDocumentService documents;
 
-	DocumentController(DocumentService documents) {
+	PrintDocumentController(PrintDocumentService documents) {
 		this.documents = documents;
 	}
 
 	@GetMapping("/templates")
-	List<DocumentService.TemplateInfo> templates() {
+	List<PrintDocumentService.TemplateInfo> templates() {
 		return documents.templates();
 	}
 
 	@GetMapping("/placeholders")
-	List<DocumentService.Placeholder> placeholders() {
+	List<PrintDocumentService.Placeholder> placeholders() {
 		return documents.placeholders();
 	}
 
 	/** 미리보기(PREVIEW)는 이력을 남기지 않고, 인쇄(PRINT)는 문서번호를 매겨 인쇄 이력을 남긴다 */
 	@PostMapping("/render")
-	DocumentService.Result render(@RequestBody RenderRequest body) {
+	PrintDocumentService.Result render(@RequestBody RenderRequest body) {
 		return documents.render(body.templateCode(), body.accountIds(),
-				body.purpose() == null ? DocumentService.Purpose.PREVIEW : body.purpose());
+				body.purpose() == null ? PrintDocumentService.Purpose.PREVIEW : body.purpose());
 	}
 
 	@GetMapping("/print-log/{accountId}")
-	List<DocumentService.PrintLogRow> printLog(@PathVariable long accountId) {
+	List<PrintDocumentService.PrintLogRow> printLog(@PathVariable long accountId) {
 		return documents.printLog(accountId);
 	}
 }

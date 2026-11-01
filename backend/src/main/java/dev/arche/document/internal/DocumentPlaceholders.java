@@ -103,8 +103,11 @@ final class DocumentPlaceholders {
 		m.put("가수금", won(v.suspense()));
 		m.put("청구금액", won(v.overdueAmount()));
 		m.put("완제금액", won(v.payoffAmount()));
-		m.put("연체시작일", date(v.delinquentSince()));
-		m.put("연체일수", String.valueOf(v.delinquencyDays()));
+		// 매입채권처럼 연체 시작일 없이 상실된 채권은 상실일부터 센다
+		LocalDate since = v.delinquentSince() != null ? v.delinquentSince() : v.acceleratedOn();
+		m.put("연체시작일", date(since));
+		m.put("연체일수", since == null ? "0"
+				: String.valueOf(Math.max(v.delinquencyDays(), java.time.temporal.ChronoUnit.DAYS.between(since, v.asOf()))));
 		m.put("미납회차", String.valueOf(v.overdueInstallments()));
 		m.put("최초미납약정일", date(v.oldestOverdueDueDate()));
 		m.put("납부기한", date(paymentDeadline));
@@ -149,7 +152,7 @@ final class DocumentPlaceholders {
 		m.put("가수금", "가수금 잔액");
 		m.put("청구금액", "지금 갚아야 할 금액 (상실·만기 경과·매입채권은 완제 금액, R47 기준)");
 		m.put("완제금액", "업무일자에 완제할 때 금액 (R8)");
-		m.put("연체시작일", "가장 오래된 미납 약정일");
+		m.put("연체시작일", "가장 오래된 미납 약정일 (없으면 기한이익 상실일)");
 		m.put("연체일수", "연체일수");
 		m.put("미납회차", "미납 회차 수");
 		m.put("최초미납약정일", "가장 오래된 미납 회차의 약정일");

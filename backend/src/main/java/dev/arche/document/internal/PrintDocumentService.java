@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 인쇄는 발송이 아니므로 추심 연락 횟수(7일 7회)에 넣지 않는다. 실제로 보내면 우편 발송으로 따로 기록한다.
  */
 @Service
-class DocumentService {
+class PrintDocumentService {
 
 	static final int MAX_BATCH = 200;
 	/** 독촉장 납부 기한: 발행일 + 7일, 휴일이면 다음 영업일 */
@@ -73,7 +73,7 @@ class DocumentService {
 	private final Clock clock;
 	private final DocumentPlaceholders.Company company;
 
-	DocumentService(JdbcClient jdbc, LoanAccounts accounts, Customers customers, ProductCatalog products,
+	PrintDocumentService(JdbcClient jdbc, LoanAccounts accounts, Customers customers, ProductCatalog products,
 			StaffDirectory staff, CollectionContacts collection, BusinessDates businessDates, Clock clock,
 			@Value("${arche.company.name:예시대부(가상)}") String companyName,
 			@Value("${arche.company.address:가상시 예시구 샘플로 123 (가상 주소)}") String companyAddress,
@@ -206,6 +206,9 @@ class DocumentService {
 		}
 		if ("ACCELERATION".equals(rule)) {
 			boolean noticed = "PENDING".equals(v.noticeStatus()) || "EXECUTED".equals(v.noticeStatus());
+			if (v.acquired() && !noticed) {
+				return Optional.of("매입채권은 양수 전에 원채권자가 기한이익을 상실시킨 채권이라 통보서 대상이 아닙니다");
+			}
 			if (!noticed && !accelerated) {
 				return Optional.of("기한이익상실 통지 대상이 아닙니다 (사유 발생·상실 기록 없음)");
 			}

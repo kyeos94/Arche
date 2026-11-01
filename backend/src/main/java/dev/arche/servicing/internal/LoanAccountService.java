@@ -523,7 +523,8 @@ class LoanAccountService implements LoanAccounts {
 				.filter(n -> n.status() != dev.arche.servicing.engine.NoticeStatus.VOID
 						&& n.status() != dev.arche.servicing.engine.NoticeStatus.CANCELLED)
 				.reduce((first, second) -> second).orElse(null);
-		return new DocumentView(a.getId(), a.accountNo(), a.customerId(), a.productCode(), r.status().name(),
+		return new DocumentView(a.getId(), a.accountNo(), a.customerId(), a.productCode(),
+				a.repaymentMethod() == dev.arche.common.RepaymentMethod.ACQUIRED, r.status().name(),
 				a.disbursedOn(), a.initialPrincipal(), terms.rateAt(today), r.principalBalance(), overduePrincipal,
 				r.outstandingNormalInterest(), r.outstandingLateInterest(), r.cost(), r.suspense(), due.overdue(),
 				r.payoffAmount(), r.delinquentSince(), r.delinquencyDays(), overdue.size(),
