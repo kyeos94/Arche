@@ -48,6 +48,22 @@ arche:
       # Mock 송금 응답 지연, 타임아웃 시나리오(계좌 끝자리 7·8)의 대기 시간
       delay-ms: 300
       timeout-ms: 1500
+    # 대출 비교 플랫폼 Mock (가상 플랫폼 코드). 수신 API는 X-Platform-Key 헤더로 인증
+    platform:
+      mock:
+        code: MOCKPLAT
+        api-key: ${ARCHE_PLATFORM_KEY:local-platform-key}
+  # 신청 서류 파일 저장 위치 (로컬 디스크 어댑터). 운영은 NAS 마운트 경로 등으로 교체
+  storage:
+    dir: ${ARCHE_STORAGE_DIR:${java.io.tmpdir}/arche-storage}
+  # 고객에게 문자로 보내는 본인인증 랜딩 링크의 사이트 주소 (guide 11.3)
+  landing:
+    base-url: ${ARCHE_LANDING_BASE_URL:http://localhost:5173}
+  origination:
+    # 중개수수료 조기 완제 환수 점검 (R56, 일마감 23:00 뒤)
+    clawback-cron: "0 30 23 * * *"
+    # 심사자 배정 전략: least-loaded(정책서 7장 기본) 또는 round-robin
+    assignment-strategy: ${ARCHE_ASSIGNMENT_STRATEGY:least-loaded}
   demo:
     # 데모 직원(역할별 1명)과 G11·G27·G28 재현용 계약을 만든다. 운영에서는 false
     enabled: ${ARCHE_DEMO:true}

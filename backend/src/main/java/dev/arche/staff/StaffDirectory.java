@@ -1,5 +1,6 @@
 package dev.arche.staff;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -18,4 +19,7 @@ public interface StaffDirectory {
 	Optional<CurrentStaff> byId(long staffId);
 
 	Optional<CurrentStaff> byLoginId(String loginId);
+
+	/** 로그인할 수 있는(사용 중·잠기지 않은) 해당 역할 직원. 심사자 배정 후보 등 (R55) */
+	List<CurrentStaff> activeByRole(Role role);
 }

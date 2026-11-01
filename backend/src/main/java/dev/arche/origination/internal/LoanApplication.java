@@ -9,10 +9,16 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "loan_application")
 class LoanApplication extends BaseEntity {
+
+	/** 접수 채널 (guide 2.1). 채널별 요청은 ApplicationIntakeCommand 하나로 정규화된다 */
+	enum Channel {
+		STAFF, BROKER, PLATFORM
+	}
 
 	private String applicationNo;
 	private long customerId;
@@ -27,20 +33,31 @@ class LoanApplication extends BaseEntity {
 	private ApplicationStatus status;
 	private Long underwriterId;
 	private LocalDate disbursedOn;
+	@Enumerated(EnumType.STRING)
+	private Channel channel;
+	private String intakeSource;
+	private String externalRef;
+	private OffsetDateTime assignedAt;
+	private LocalDate decidedOn;
+	private String rejectReasonCode;
+	private Long brokerId;
 
 	protected LoanApplication() {
 	}
 
-	LoanApplication(String applicationNo, long customerId, String productCode, long requestedAmount, int termMonths,
-			int graceMonths, int dueDay) {
+	LoanApplication(String applicationNo, ApplicationIntakeCommand c) {
 		this.applicationNo = applicationNo;
-		this.customerId = customerId;
-		this.productCode = productCode;
-		this.requestedAmount = requestedAmount;
-		this.termMonths = termMonths;
-		this.graceMonths = graceMonths;
-		this.dueDay = dueDay;
+		this.customerId = c.customerId();
+		this.productCode = c.productCode();
+		this.requestedAmount = c.requestedAmount();
+		this.termMonths = c.termMonths();
+		this.graceMonths = c.graceMonths();
+		this.dueDay = c.dueDay();
 		this.status = ApplicationStatus.RECEIVED;
+		this.channel = c.channel();
+		this.intakeSource = c.intakeSource();
+		this.externalRef = c.externalRef();
+		this.brokerId = c.brokerId();
 	}
 
 	ApplicationStatus moveTo(ApplicationStatus next) {
@@ -52,17 +69,40 @@ class LoanApplication extends BaseEntity {
 		return from;
 	}
 
-	void assign(long staffId) {
+	void assign(long staffId, OffsetDateTime at) {
 		this.underwriterId = staffId;
+		this.assignedAt = at;
 	}
 
-	void approve(long amount, BigDecimal rate) {
+	void approve(long amount, BigDecimal rate, LocalDate on) {
 		this.approvedAmount = amount;
 		this.approvedRate = rate;
+		this.decidedOn = on;
+	}
+
+	void rejected(String reasonCode, LocalDate on) {
+		this.rejectReasonCode = reasonCode;
+		this.decidedOn = on;
 	}
 
 	void disbursed(LocalDate on) {
 		this.disbursedOn = on;
+	}
+
+	/** 승인 전 단계 (서류·동의를 바꿀 수 있는 상태) */
+	boolean beforeDecision() {
+		return switch (status) {
+			case RECEIVED, PRE_SCREENING, ASSIGNED, UNDERWRITING -> true;
+			default -> false;
+		};
+	}
+
+	/** 진행 중 (중복 신청 판정 대상, R53): 거절·철회·실행 완료가 아닌 신청 */
+	boolean active() {
+		return switch (status) {
+			case REJECTED, WITHDRAWN, DISBURSED -> false;
+			default -> true;
+		};
 	}
 
 	String applicationNo() {
@@ -111,5 +151,33 @@ class LoanApplication extends BaseEntity {
 
 	LocalDate disbursedOn() {
 		return disbursedOn;
+	}
+
+	Channel channel() {
+		return channel;
+	}
+
+	String intakeSource() {
+		return intakeSource;
+	}
+
+	String externalRef() {
+		return externalRef;
+	}
+
+	OffsetDateTime assignedAt() {
+		return assignedAt;
+	}
+
+	LocalDate decidedOn() {
+		return decidedOn;
+	}
+
+	String rejectReasonCode() {
+		return rejectReasonCode;
+	}
+
+	Long brokerId() {
+		return brokerId;
 	}
 }

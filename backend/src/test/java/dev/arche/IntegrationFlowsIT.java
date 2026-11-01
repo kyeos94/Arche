@@ -169,6 +169,14 @@ class IntegrationFlowsIT extends IntegrationTest {
 		for (String to : List.of("PRE_SCREENING", "ASSIGNED", "UNDERWRITING")) {
 			ok(postJson(underwriter, "/api/applications/" + appId + "/transitions", Map.of("to", to)));
 		}
+		// 필수 서류는 확인을 마쳐야 승인할 수 있다 (R54): 서면 원본 접수 → 확인
+		for (JsonNode d : ok(getJson(underwriter, "/api/applications/" + appId + "/documents"))) {
+			if (d.get("required").asBoolean()) {
+				String doc = "/api/applications/" + appId + "/documents/" + d.get("id").asLong();
+				ok(postJson(underwriter, doc + "/paper", Map.of("note", "원본 대조")));
+				ok(postJson(underwriter, doc + "/verify", Map.of()));
+			}
+		}
 		// 심사역 전결은 1,000만원 이하
 		assertThat(postJson(underwriter, "/api/applications/" + appId + "/approval",
 				Map.of("amount", 12_000_000, "rate", "18.9")).andReturn().getResponse().getStatus()).isEqualTo(403);

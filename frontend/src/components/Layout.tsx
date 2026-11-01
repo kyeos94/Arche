@@ -29,6 +29,11 @@ const nav: { to: string; label: string; permission?: string; anyOf?: string[] }[
   { to: '/admin', label: '운영 관리', permission: 'admin.manage' },
   { to: '/message-templates', label: '문자 템플릿', permission: 'admin.manage' },
   { to: '/credit-reports', label: '신용정보 보고', permission: 'admin.manage' },
+  { to: '/applications', label: '신청 목록', permission: 'application.review' },
+  { to: '/underwriters', label: '심사자 배정', permission: 'application.review' },
+  { to: '/brokers', label: '중개업자', permission: 'application.review' },
+  { to: '/products', label: '상품', permission: 'application.review' },
+  { to: '/mock-platform', label: 'Mock 플랫폼', permission: 'application.review' },
   { to: '/account', label: '내 계정' },
 ]
 

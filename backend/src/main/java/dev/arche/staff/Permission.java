@@ -57,7 +57,11 @@ public enum Permission {
 	/** 수기 조정·상계·상태 되돌리기 승인 (R42~R44, 작성자 ≠ 승인자) */
 	LOAN_ADJUST_APPROVE("loan.adjust.approve", HEAD),
 	/** 추심 중지 등록·해제 (R45·R46) */
-	COLLECTION_STOP("collection.stop", COLLECTION_LEAD, HEAD);
+	COLLECTION_STOP("collection.stop", COLLECTION_LEAD, HEAD),
+	/** 심사자 수동 배정·재배정, 심사자 프로필(담당 상품·부재) 관리 (R55) */
+	APPLICATION_ASSIGN("application.assign", UNDERWRITING_LEAD, HEAD),
+	/** 중개업자 등록·API 키·수수료율 관리, 불완전판매 환수·환수 점검 (R56) */
+	BROKER_MANAGE("broker.manage", UNDERWRITING_LEAD, HEAD);
 
 	private final String code;
 	private final Set<Role> roles;

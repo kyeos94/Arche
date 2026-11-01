@@ -1,4 +1,4 @@
-package dev.arche.integration.internal;
+package dev.arche.payment.internal;
 
 import tools.jackson.databind.ObjectMapper;
 import dev.arche.common.BusinessException;
@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 가상계좌 입금 통지 웹훅 (MVP 한 줄기). 서명 검증 → 거래고유번호로 중복 통지 무시 → 계약 자동 충당.
  * 가상계좌번호로 계약을 못 찾으면 미확인 입금으로 보관한다. 같은 통지가 다시 와도 200 + DUPLICATE (재시도 안전).
+ * <p>포트(VirtualAccountPort)는 integration, 통지를 받은 뒤의 처리는 입금 업무이므로 payment 모듈에 둔다.
+ * integration은 업무 모듈에 의존하지 않는 말단 모듈이어야 업무 모듈이 포트를 쓸 수 있다 (ADR 0007, 모듈 순환 방지).
  */
 @RestController
 @RequestMapping("/api/integration/virtual-account")
