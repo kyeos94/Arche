@@ -42,6 +42,12 @@ arche:
   integration:
     virtual-account:
       secret: ${ARCHE_VA_SECRET:local-virtual-account-secret}
+    # Mock 팩스·우편·신용정보 보고 파일을 두는 로컬 폴더 (ADR 0008)
+    files-dir: ${ARCHE_FILES_DIR:build/integration-files}
+    transfer:
+      # Mock 송금 응답 지연, 타임아웃 시나리오(계좌 끝자리 7·8)의 대기 시간
+      delay-ms: 300
+      timeout-ms: 1500
   demo:
     # 데모 직원(역할별 1명)과 G11·G27·G28 재현용 계약을 만든다. 운영에서는 false
     enabled: ${ARCHE_DEMO:true}

@@ -7,6 +7,7 @@ import java.util.List;
 /**
  * 추심 연락 한도: 계약 1건당 직전 7일(당일 포함) 동안 7회 (정책서 6장, G14).
  * 전화·문자·방문 모두 1회로 세고, 법정·계약상 통지는 한도에서 제외한다. 차단된 시도는 세지 않는다.
+ * 팩스·우편으로 보내는 추심 안내도 1회로 센다 (R59).
  */
 public final class ContactQuotaGuard {
 
@@ -15,6 +16,8 @@ public final class ContactQuotaGuard {
 
 	public enum Channel {
 		CALL, SMS, VISIT,
+		/** 추심 목적 팩스·우편 (R59) */
+		FAX, POST,
 		/** 납입 안내(연체 전), 기한이익상실 통지, 양도 통지 등 — 한도 제외 */
 		STATUTORY_NOTICE
 	}
