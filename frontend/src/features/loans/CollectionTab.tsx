@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import type { ContactChannel, LoanDetail, PromiseJudgment } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatDateTime, formatMoney, statusLabel } from '@/lib/format'
 import { promiseSchema } from '@/lib/schemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 import { CollectionStopCard } from '@/features/lifecycle/CollectionStopCard'
@@ -54,6 +56,7 @@ function LimitationCard({ loanId, businessDate }: { loanId: number; businessDate
     memo: (e) => e.memo,
     counted: (e) => (e.counted ? '중단·연장' : '기산 전'),
   })
+  const eventPaging = usePaging(events.sorted)
   return (
     <Card>
       <CardHeader>
@@ -76,26 +79,28 @@ function LimitationCard({ loanId, businessDate }: { loanId: number; businessDate
           </div>
         )}
         {info && info.events.length > 0 && (
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...events.header('date')}>날짜</SortTH>
-                <SortTH {...events.header('type')}>사유</SortTH>
-                <SortTH {...events.header('memo')}>메모</SortTH>
-                <SortTH {...events.header('counted')}>반영</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {events.sorted.map((e, i) => (
-                <TR key={i} className={cn(!e.counted && 'text-muted-foreground')}>
-                  <TD>{formatDate(e.date)}</TD>
-                  <TD>{statusLabel(e.type)}</TD>
-                  <TD>{e.memo ?? ''}</TD>
-                  <TD>{e.counted ? '중단·연장' : '기산 전'}</TD>
+          <PagedList paging={eventPaging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...events.header('date')}>날짜</SortTH>
+                  <SortTH {...events.header('type')}>사유</SortTH>
+                  <SortTH {...events.header('memo')}>메모</SortTH>
+                  <SortTH {...events.header('counted')}>반영</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {eventPaging.rows.map((e, i) => (
+                  <TR key={i} className={cn(!e.counted && 'text-muted-foreground')}>
+                    <TD>{formatDate(e.date)}</TD>
+                    <TD>{statusLabel(e.type)}</TD>
+                    <TD>{e.memo ?? ''}</TD>
+                    <TD>{e.counted ? '중단·연장' : '기산 전'}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         )}
         <Can permission="collection.legal">
           <form
@@ -152,6 +157,7 @@ function ContactsCard({ loanId }: { loanId: number }) {
     count: (c) => (c.channel === 'STATUTORY_NOTICE' ? null : c.countInWindow),
     createdBy: (c) => c.createdBy,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -196,37 +202,39 @@ function ContactsCard({ loanId }: { loanId: number }) {
           <ErrorMessage error={save.error} />
         </Can>
         <ErrorMessage error={q.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('date')}>날짜</SortTH>
-              <SortTH {...header('contactedAt')}>기록 시각</SortTH>
-              <SortTH {...header('channel')}>수단</SortTH>
-              <SortTH {...header('result')}>결과</SortTH>
-              <SortTH {...header('count')} className="text-right">
-                창 안 기존 횟수
-              </SortTH>
-              <TH>사유·메모</TH>
-              <SortTH {...header('createdBy')}>담당</SortTH>
-            </TR>
-          </THead>
-          <TBody>
-            {data && data.contacts.length === 0 && <EmptyRow colSpan={7} />}
-            {sorted.map((c) => (
-              <TR key={c.id} className={cn(c.result === 'BLOCKED' && 'text-muted-foreground')}>
-                <TD>{formatDate(c.contactDate)}</TD>
-                <TD>{formatDateTime(c.contactedAt)}</TD>
-                <TD>{statusLabel(c.channel)}</TD>
-                <TD>
-                  <StatusBadge status={c.result} />
-                </TD>
-                <TD className="num">{c.channel === 'STATUTORY_NOTICE' ? '—' : c.countInWindow}</TD>
-                <TD>{[c.reason, c.memo].filter(Boolean).join(' / ')}</TD>
-                <TD>{c.createdBy}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('date')}>날짜</SortTH>
+                <SortTH {...header('contactedAt')}>기록 시각</SortTH>
+                <SortTH {...header('channel')}>수단</SortTH>
+                <SortTH {...header('result')}>결과</SortTH>
+                <SortTH {...header('count')} className="text-right">
+                  창 안 기존 횟수
+                </SortTH>
+                <TH>사유·메모</TH>
+                <SortTH {...header('createdBy')}>담당</SortTH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {data && data.contacts.length === 0 && <EmptyRow colSpan={7} />}
+              {paging.rows.map((c) => (
+                <TR key={c.id} className={cn(c.result === 'BLOCKED' && 'text-muted-foreground')}>
+                  <TD>{formatDate(c.contactDate)}</TD>
+                  <TD>{formatDateTime(c.contactedAt)}</TD>
+                  <TD>{statusLabel(c.channel)}</TD>
+                  <TD>
+                    <StatusBadge status={c.result} />
+                  </TD>
+                  <TD className="num">{c.channel === 'STATUTORY_NOTICE' ? '—' : c.countInWindow}</TD>
+                  <TD>{[c.reason, c.memo].filter(Boolean).join(' / ')}</TD>
+                  <TD>{c.createdBy}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
@@ -317,41 +325,44 @@ function JudgmentsTable({ rows }: { rows: PromiseJudgment[] }) {
     misses: (j) => (j.fulfilled === null ? null : j.consecutiveMisses),
     action: (j) => (j.fulfilled === null ? null : statusLabel(j.action)),
   })
+  const paging = usePaging(sorted)
   return (
-    <Table>
-      <THead>
-        <TR>
-          <SortTH {...header('index')}>회차</SortTH>
-          <SortTH {...header('promiseDate')}>약속일</SortTH>
-          <SortTH {...header('deadline')}>기한</SortTH>
-          <SortTH {...header('paid')} className="text-right">
-            판정 대상 입금
-          </SortTH>
-          <SortTH {...header('verdict')}>판정</SortTH>
-          <SortTH {...header('misses')} className="text-right">
-            연속 불이행
-          </SortTH>
-          <SortTH {...header('action')}>처리</SortTH>
-        </TR>
-      </THead>
-      <TBody>
-        {sorted.map((j) => (
-          <TR key={j.index}>
-            <TD>{j.index}</TD>
-            <TD>{formatDate(j.promiseDate)}</TD>
-            <TD>{formatDate(j.deadline)}</TD>
-            <TD className="num">{j.fulfilled === null ? '' : formatMoney(j.paid)}</TD>
-            <TD
-              className={cn(j.fulfilled === false && 'text-red-700', j.fulfilled === null && 'text-muted-foreground')}
-            >
-              {verdict(j)}
-            </TD>
-            <TD className="num">{j.fulfilled === null ? '' : j.consecutiveMisses}</TD>
-            <TD>{j.fulfilled === null ? '' : statusLabel(j.action)}</TD>
+    <PagedList paging={paging.props}>
+      <Table>
+        <THead>
+          <TR>
+            <SortTH {...header('index')}>회차</SortTH>
+            <SortTH {...header('promiseDate')}>약속일</SortTH>
+            <SortTH {...header('deadline')}>기한</SortTH>
+            <SortTH {...header('paid')} className="text-right">
+              판정 대상 입금
+            </SortTH>
+            <SortTH {...header('verdict')}>판정</SortTH>
+            <SortTH {...header('misses')} className="text-right">
+              연속 불이행
+            </SortTH>
+            <SortTH {...header('action')}>처리</SortTH>
           </TR>
-        ))}
-      </TBody>
-    </Table>
+        </THead>
+        <TBody>
+          {paging.rows.map((j) => (
+            <TR key={j.index}>
+              <TD>{j.index}</TD>
+              <TD>{formatDate(j.promiseDate)}</TD>
+              <TD>{formatDate(j.deadline)}</TD>
+              <TD className="num">{j.fulfilled === null ? '' : formatMoney(j.paid)}</TD>
+              <TD
+                className={cn(j.fulfilled === false && 'text-red-700', j.fulfilled === null && 'text-muted-foreground')}
+              >
+                {verdict(j)}
+              </TD>
+              <TD className="num">{j.fulfilled === null ? '' : j.consecutiveMisses}</TD>
+              <TD>{j.fulfilled === null ? '' : statusLabel(j.action)}</TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </PagedList>
   )
 }
 
@@ -391,6 +402,7 @@ function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: 
     status: (d) => statusLabel(d.status),
     extended: (d) => d.extended,
   })
+  const deferralPaging = usePaging(deferrals.sorted)
   return (
     <Card>
       <CardHeader>
@@ -431,54 +443,56 @@ function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: 
           </Can>
         )}
         <ErrorMessage error={q.error ?? register.error ?? extend.error ?? finish.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...deferrals.header('period')}>기간</SortTH>
-              <SortTH {...deferrals.header('reason')}>사유</SortTH>
-              <SortTH {...deferrals.header('status')}>상태</SortTH>
-              <SortTH {...deferrals.header('extended')}>연장</SortTH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
-            {deferrals.sorted.map((d) => (
-              <TR key={d.id}>
-                <TD>
-                  {formatDate(d.startDate)} ~ {formatDate(d.endDate)}
-                </TD>
-                <TD>{d.reason}</TD>
-                <TD>
-                  <StatusBadge status={d.status} />
-                  {d.endedOn && <span className="ml-1 text-muted-foreground">{formatDate(d.endedOn)} 종료</span>}
-                </TD>
-                <TD>{d.extended ? `연장함 (원래 ${formatDate(d.originalEnd)})` : '-'}</TD>
-                <TD className="space-x-1 text-right">
-                  {d.status === 'ACTIVE' && (
-                    <Can permission="collection.activity">
-                      {!d.extended && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const next = window.prompt('연장 종료일 (최대 3개월 뒤)', addMonths(d.endDate, 3))
-                            if (next) extend.mutate({ id: d.id, endDate: next })
-                          }}
-                        >
-                          연장
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => finish.mutate(d.id)}>
-                        종료
-                      </Button>
-                    </Can>
-                  )}
-                </TD>
+        <PagedList paging={deferralPaging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...deferrals.header('period')}>기간</SortTH>
+                <SortTH {...deferrals.header('reason')}>사유</SortTH>
+                <SortTH {...deferrals.header('status')}>상태</SortTH>
+                <SortTH {...deferrals.header('extended')}>연장</SortTH>
+                <TH />
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
+              {deferralPaging.rows.map((d) => (
+                <TR key={d.id}>
+                  <TD>
+                    {formatDate(d.startDate)} ~ {formatDate(d.endDate)}
+                  </TD>
+                  <TD>{d.reason}</TD>
+                  <TD>
+                    <StatusBadge status={d.status} />
+                    {d.endedOn && <span className="ml-1 text-muted-foreground">{formatDate(d.endedOn)} 종료</span>}
+                  </TD>
+                  <TD>{d.extended ? `연장함 (원래 ${formatDate(d.originalEnd)})` : '-'}</TD>
+                  <TD className="space-x-1 text-right">
+                    {d.status === 'ACTIVE' && (
+                      <Can permission="collection.activity">
+                        {!d.extended && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const next = window.prompt('연장 종료일 (최대 3개월 뒤)', addMonths(d.endDate, 3))
+                              if (next) extend.mutate({ id: d.id, endDate: next })
+                            }}
+                          >
+                            연장
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => finish.mutate(d.id)}>
+                          종료
+                        </Button>
+                      </Can>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
@@ -494,6 +508,7 @@ function MessagesCard({ loanId }: { loanId: number }) {
     body: (m) => m.body,
     status: (m) => statusLabel(m.status),
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -501,33 +516,35 @@ function MessagesCard({ loanId }: { loanId: number }) {
       </CardHeader>
       <CardContent>
         <ErrorMessage error={q.error} />
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('scheduledDate')}>예정일</SortTH>
-              <SortTH {...header('type')}>종류</SortTH>
-              <SortTH {...header('body')}>내용</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <TH>발송·사유</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
-            {sorted.map((m) => (
-              <TR key={m.id} className={cn(m.status === 'SKIPPED' && 'text-muted-foreground')}>
-                <TD>{formatDate(m.scheduledDate)}</TD>
-                <TD>{statusLabel(m.type)}</TD>
-                <TD className="max-w-md truncate" title={m.body}>
-                  {m.body}
-                </TD>
-                <TD>
-                  <StatusBadge status={m.status} />
-                </TD>
-                <TD>{m.status === 'SENT' ? formatDateTime(m.sentAt) : (m.skipReason ?? '')}</TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('scheduledDate')}>예정일</SortTH>
+                <SortTH {...header('type')}>종류</SortTH>
+                <SortTH {...header('body')}>내용</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <TH>발송·사유</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
+              {paging.rows.map((m) => (
+                <TR key={m.id} className={cn(m.status === 'SKIPPED' && 'text-muted-foreground')}>
+                  <TD>{formatDate(m.scheduledDate)}</TD>
+                  <TD>{statusLabel(m.type)}</TD>
+                  <TD className="max-w-md truncate" title={m.body}>
+                    {m.body}
+                  </TD>
+                  <TD>
+                    <StatusBadge status={m.status} />
+                  </TD>
+                  <TD>{m.status === 'SENT' ? formatDateTime(m.sentAt) : (m.skipReason ?? '')}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )

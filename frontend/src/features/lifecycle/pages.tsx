@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { lifecycleApi, lifecycleKeys } from '@/api/lifecycle'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Select } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatMoney } from '@/lib/format'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { ReasonDialog, RequestsTable, useInvalidateLifecycle } from './shared'
 
@@ -21,6 +23,7 @@ export function ChargeOffCandidatesPage() {
     lastPaymentOn: (c) => c.lastPaymentOn,
     claim: (c) => c.claim,
   })
+  const paging = usePaging(sorted)
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">상각 후보</h1>
@@ -29,52 +32,54 @@ export function ChargeOffCandidatesPage() {
         정산하고 장부에서 제거하며, 채권은 존속해 회수는 계속합니다 (R39).
       </Alert>
       <ErrorMessage error={q.error} />
-      <Table>
-        <THead>
-          <TR>
-            <SortTH {...header('accountNo')}>계약번호</SortTH>
-            <SortTH {...header('product')}>상품</SortTH>
-            <SortTH {...header('acceleratedOn')}>기한이익상실일</SortTH>
-            <SortTH {...header('days')} className="text-right">
-              경과일
-            </SortTH>
-            <SortTH {...header('lastPaymentOn')}>마지막 입금일</SortTH>
-            <SortTH {...header('claim')} className="text-right">
-              청구 잔액
-            </SortTH>
-            <TH />
-          </TR>
-        </THead>
-        <TBody>
-          {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {sorted.map((c) => (
-            <TR key={c.accountId}>
-              <TD>
-                <Link className="text-primary hover:underline" to={`/loans/${c.accountId}`}>
-                  {c.accountNo}
-                </Link>
-              </TD>
-              <TD>{c.productCode}</TD>
-              <TD>{formatDate(c.acceleratedOn)}</TD>
-              <TD className="num">{c.daysSinceAcceleration}일</TD>
-              <TD>{formatDate(c.lastPaymentOn)}</TD>
-              <TD className="num">{formatMoney(c.claim)}</TD>
-              <TD>
-                <ReasonDialog
-                  trigger="상각 확정"
-                  title={`${c.accountNo} 상각 확정`}
-                  description="확정일 = 업무일자. 결재 사유를 남기세요."
-                  submitLabel="상각 확정"
-                  onSubmit={async (reason) => {
-                    await lifecycleApi.chargeOff(c.accountId, reason)
-                    await invalidate(c.accountId)
-                  }}
-                />
-              </TD>
+      <PagedList paging={paging.props}>
+        <Table>
+          <THead>
+            <TR>
+              <SortTH {...header('accountNo')}>계약번호</SortTH>
+              <SortTH {...header('product')}>상품</SortTH>
+              <SortTH {...header('acceleratedOn')}>기한이익상실일</SortTH>
+              <SortTH {...header('days')} className="text-right">
+                경과일
+              </SortTH>
+              <SortTH {...header('lastPaymentOn')}>마지막 입금일</SortTH>
+              <SortTH {...header('claim')} className="text-right">
+                청구 잔액
+              </SortTH>
+              <TH />
             </TR>
-          ))}
-        </TBody>
-      </Table>
+          </THead>
+          <TBody>
+            {q.data?.length === 0 && <EmptyRow colSpan={7} />}
+            {paging.rows.map((c) => (
+              <TR key={c.accountId}>
+                <TD>
+                  <Link className="text-primary hover:underline" to={`/loans/${c.accountId}`}>
+                    {c.accountNo}
+                  </Link>
+                </TD>
+                <TD>{c.productCode}</TD>
+                <TD>{formatDate(c.acceleratedOn)}</TD>
+                <TD className="num">{c.daysSinceAcceleration}일</TD>
+                <TD>{formatDate(c.lastPaymentOn)}</TD>
+                <TD className="num">{formatMoney(c.claim)}</TD>
+                <TD>
+                  <ReasonDialog
+                    trigger="상각 확정"
+                    title={`${c.accountNo} 상각 확정`}
+                    description="확정일 = 업무일자. 결재 사유를 남기세요."
+                    submitLabel="상각 확정"
+                    onSubmit={async (reason) => {
+                      await lifecycleApi.chargeOff(c.accountId, reason)
+                      await invalidate(c.accountId)
+                    }}
+                  />
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </PagedList>
     </div>
   )
 }

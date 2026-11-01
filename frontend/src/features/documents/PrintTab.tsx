@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { documentKeys, documents } from '@/api/documents'
 import type { LoanDetail } from '@/api/types'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +10,7 @@ import { Select } from '@/components/ui/input'
 import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { buildPrintDocument, fitPages, printHtml } from '@/lib/print'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
 /** 계약 상세 "양식인쇄" 탭 (R72): 양식을 골라 미리보고 1건 인쇄 */
@@ -31,6 +33,7 @@ export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> 
     documentNo: (r) => r.documentNo,
     printedBy: (r) => r.printedBy,
   })
+  const paging = usePaging(logRows)
   const print = useMutation({
     mutationFn: () => documents.render({ templateCode: code, accountIds: [loan.id], purpose: 'PRINT' }),
     onSuccess: async (result) => {
@@ -96,29 +99,31 @@ export function PrintTab({ loan }: { loan: Pick<LoanDetail, 'id' | 'accountNo'> 
           <CardTitle>인쇄 이력</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <THead>
-              <TR>
-                <SortTH {...header('printedAt')}>일시</SortTH>
-                <SortTH {...header('businessDate')}>업무일자</SortTH>
-                <SortTH {...header('template')}>양식</SortTH>
-                <SortTH {...header('documentNo')}>문서번호</SortTH>
-                <SortTH {...header('printedBy')}>인쇄한 직원</SortTH>
-              </TR>
-            </THead>
-            <TBody>
-              {log.data?.length === 0 && <EmptyRow colSpan={5}>인쇄한 양식이 없습니다</EmptyRow>}
-              {logRows.map((r) => (
-                <TR key={r.id}>
-                  <TD className="whitespace-nowrap">{formatDateTime(r.printedAt)}</TD>
-                  <TD>{formatDate(r.businessDate)}</TD>
-                  <TD>{r.templateName}</TD>
-                  <TD className="font-mono">{r.documentNo}</TD>
-                  <TD>{r.printedBy}</TD>
+          <PagedList paging={paging.props}>
+            <Table>
+              <THead>
+                <TR>
+                  <SortTH {...header('printedAt')}>일시</SortTH>
+                  <SortTH {...header('businessDate')}>업무일자</SortTH>
+                  <SortTH {...header('template')}>양식</SortTH>
+                  <SortTH {...header('documentNo')}>문서번호</SortTH>
+                  <SortTH {...header('printedBy')}>인쇄한 직원</SortTH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {log.data?.length === 0 && <EmptyRow colSpan={5}>인쇄한 양식이 없습니다</EmptyRow>}
+                {paging.rows.map((r) => (
+                  <TR key={r.id}>
+                    <TD className="whitespace-nowrap">{formatDateTime(r.printedAt)}</TD>
+                    <TD>{formatDate(r.businessDate)}</TD>
+                    <TD>{r.templateName}</TD>
+                    <TD className="font-mono">{r.documentNo}</TD>
+                    <TD>{r.printedBy}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </PagedList>
         </CardContent>
       </Card>
     </div>

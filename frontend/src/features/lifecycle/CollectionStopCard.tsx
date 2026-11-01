@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { lifecycleApi, lifecycleKeys, stopReasonLabels, type CollectionStopDto } from '@/api/lifecycle'
+import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatRate, statusLabel } from '@/lib/format'
 import { STOP_REASONS, collectionStopSchema, reliefSchema } from '@/lib/lifecycleSchemas'
+import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 import { ReasonDialog, useInvalidateLifecycle } from './shared'
 
@@ -37,6 +39,7 @@ export function CollectionStopCard({ loanId, businessDate }: { loanId: number; b
     status: (s) => statusLabel(s.status),
     releasedOn: (s) => s.releasedOn,
   })
+  const paging = usePaging(sorted)
   return (
     <Card>
       <CardHeader>
@@ -53,57 +56,61 @@ export function CollectionStopCard({ loanId, businessDate }: { loanId: number; b
             문자를 보내지 않습니다{active.suspendsInterest ? '. 이자 부과 중단 중' : ''}.
           </Alert>
         )}
-        <Table>
-          <THead>
-            <TR>
-              <SortTH {...header('reason')}>사유</SortTH>
-              <SortTH {...header('effectiveDate')}>발생일</SortTH>
-              <SortTH {...header('memo')}>근거</SortTH>
-              <SortTH {...header('interest')}>이자</SortTH>
-              <SortTH {...header('reliefRate')}>조정 금리</SortTH>
-              <SortTH {...header('status')}>상태</SortTH>
-              <SortTH {...header('releasedOn')}>해제</SortTH>
-              <TH />
-            </TR>
-          </THead>
-          <TBody>
-            {q.data?.length === 0 && <EmptyRow colSpan={8} />}
-            {sorted.map((s) => (
-              <TR key={s.id}>
-                <TD>{s.reasonLabel}</TD>
-                <TD>{formatDate(s.effectiveDate)}</TD>
-                <TD>{s.memo}</TD>
-                <TD>{s.suspendsInterest ? '부과 중단' : '변경 없음'}</TD>
-                <TD>{s.reliefRate === null ? '-' : `${formatRate(s.reliefRate)} (${formatDate(s.reliefFrom)}부터)`}</TD>
-                <TD>
-                  <StatusBadge status={s.status} />
-                </TD>
-                <TD>{s.releasedOn ? `${formatDate(s.releasedOn)} · ${s.releaseReason ?? ''}` : '-'}</TD>
-                <TD>
-                  {s.status === 'ACTIVE' && (
-                    <Can permission="collection.stop">
-                      <div className="flex gap-1">
-                        {s.reason === 'PUBLIC_WORKOUT' && s.reliefFrom === null && (
-                          <ReliefDialog loanId={loanId} stop={s} businessDate={businessDate} />
-                        )}
-                        <ReasonDialog
-                          trigger="해제"
-                          title="추심 중지 해제"
-                          description="같은 묶음(고객의 모든 계약)이 함께 해제되고, 이자 부과 중단은 오늘로 끝납니다 (R46)."
-                          submitLabel="해제"
-                          onSubmit={async (reason) => {
-                            await lifecycleApi.releaseStop(loanId, s.id, reason)
-                            await invalidate()
-                          }}
-                        />
-                      </div>
-                    </Can>
-                  )}
-                </TD>
+        <PagedList paging={paging.props}>
+          <Table>
+            <THead>
+              <TR>
+                <SortTH {...header('reason')}>사유</SortTH>
+                <SortTH {...header('effectiveDate')}>발생일</SortTH>
+                <SortTH {...header('memo')}>근거</SortTH>
+                <SortTH {...header('interest')}>이자</SortTH>
+                <SortTH {...header('reliefRate')}>조정 금리</SortTH>
+                <SortTH {...header('status')}>상태</SortTH>
+                <SortTH {...header('releasedOn')}>해제</SortTH>
+                <TH />
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {q.data?.length === 0 && <EmptyRow colSpan={8} />}
+              {paging.rows.map((s) => (
+                <TR key={s.id}>
+                  <TD>{s.reasonLabel}</TD>
+                  <TD>{formatDate(s.effectiveDate)}</TD>
+                  <TD>{s.memo}</TD>
+                  <TD>{s.suspendsInterest ? '부과 중단' : '변경 없음'}</TD>
+                  <TD>
+                    {s.reliefRate === null ? '-' : `${formatRate(s.reliefRate)} (${formatDate(s.reliefFrom)}부터)`}
+                  </TD>
+                  <TD>
+                    <StatusBadge status={s.status} />
+                  </TD>
+                  <TD>{s.releasedOn ? `${formatDate(s.releasedOn)} · ${s.releaseReason ?? ''}` : '-'}</TD>
+                  <TD>
+                    {s.status === 'ACTIVE' && (
+                      <Can permission="collection.stop">
+                        <div className="flex gap-1">
+                          {s.reason === 'PUBLIC_WORKOUT' && s.reliefFrom === null && (
+                            <ReliefDialog loanId={loanId} stop={s} businessDate={businessDate} />
+                          )}
+                          <ReasonDialog
+                            trigger="해제"
+                            title="추심 중지 해제"
+                            description="같은 묶음(고객의 모든 계약)이 함께 해제되고, 이자 부과 중단은 오늘로 끝납니다 (R46)."
+                            submitLabel="해제"
+                            onSubmit={async (reason) => {
+                              await lifecycleApi.releaseStop(loanId, s.id, reason)
+                              await invalidate()
+                            }}
+                          />
+                        </div>
+                      </Can>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </PagedList>
       </CardContent>
     </Card>
   )
