@@ -10,6 +10,8 @@ import { LoanDetailPage } from '@/features/loans/LoanDetailPage'
 import { LoanListPage } from '@/features/loans/LoanListPage'
 import { NewLoanPage } from '@/features/loans/NewLoanPage'
 import { CorrectionsPage } from '@/features/payments/CorrectionsPage'
+import { SplitPage } from '@/features/payments/SplitPage'
+import { LegalActionsPage } from '@/features/collection/LegalActionsPage'
 import { UnmatchedPage } from '@/features/payments/UnmatchedPage'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -29,6 +31,8 @@ export function App() {
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="unmatched" element={<UnmatchedPage />} />
         <Route path="corrections" element={<CorrectionsPage />} />
+        <Route path="payment-splits" element={<SplitPage />} />
+        <Route path="legal-actions" element={<LegalActionsPage />} />
         <Route path="bulk" element={<BulkPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route

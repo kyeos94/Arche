@@ -7,6 +7,7 @@ import { ErrorMessage } from '@/components/ui/alert'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Can } from '@/features/auth/auth'
+import { LegalTab } from '@/features/collection/LegalTab'
 import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
 import { CollectionTab } from './CollectionTab'
@@ -115,6 +116,7 @@ export function LoanDetailPage() {
           <TabsTrigger value="payments">입금내역</TabsTrigger>
           <TabsTrigger value="history">조건변경이력</TabsTrigger>
           <TabsTrigger value="collection">추심</TabsTrigger>
+          <TabsTrigger value="legal">법조치</TabsTrigger>
         </TabsList>
         {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
         <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
@@ -122,6 +124,7 @@ export function LoanDetailPage() {
         <TabsContent value="payments">{tab === 'payments' && <PaymentsTab loanId={id} />}</TabsContent>
         <TabsContent value="history">{tab === 'history' && <HistoryTab loanId={id} />}</TabsContent>
         <TabsContent value="collection">{tab === 'collection' && <CollectionTab loan={loan} />}</TabsContent>
+        <TabsContent value="legal">{tab === 'legal' && <LegalTab loan={loan} />}</TabsContent>
       </Tabs>
     </div>
   )

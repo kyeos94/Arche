@@ -19,6 +19,7 @@ const tones: Record<string, string> = {
   CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
   REPLACED: 'bg-slate-100 text-slate-600 border-slate-200',
   PAID_OFF: 'bg-sky-50 text-sky-700 border-sky-200',
+  SPLIT: 'bg-sky-50 text-sky-700 border-sky-200',
 }
 
 export function Badge({ className, ...props }: React.ComponentProps<'span'>) {

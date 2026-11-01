@@ -9,8 +9,16 @@ import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
-import { formatMoney } from '@/lib/format'
-import { DUE_DAYS, dueDayChangeSchema, paymentSchema, rateChangeSchema, workoutSchema } from '@/lib/schemas'
+import { formatMoney, legalLabel, statusLabel } from '@/lib/format'
+import {
+  DUE_DAYS,
+  PAYER_TYPES,
+  PAYMENT_CHANNELS,
+  dueDayChangeSchema,
+  paymentSchema,
+  rateChangeSchema,
+  workoutSchema,
+} from '@/lib/schemas'
 import { useAuth } from '@/features/auth/auth'
 import { useInvalidateLoan } from './hooks'
 
@@ -24,9 +32,27 @@ export function PaymentDialog({ loan }: { loan: LoanDetail }) {
   const invalidate = useInvalidateLoan()
   const form = useForm<PaymentInput, unknown, PaymentOutput>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { bankDate: loan.businessDate, amount: '', depositorName: loan.customer.name, prepayment: false },
+    defaultValues: {
+      bankDate: loan.businessDate,
+      amount: '',
+      depositorName: loan.customer.name,
+      prepayment: false,
+      channel: 'BANK_TRANSFER',
+      payerType: 'CUSTOMER',
+      payerName: '',
+      payerRef: '',
+      legalActionId: '',
+    },
   })
   const prepayment = form.watch('prepayment')
+  const payerType = form.watch('payerType')
+  const channel = form.watch('channel')
+  const court = channel === 'AUCTION_DISTRIBUTION' || channel === 'COURT_DEPOSIT'
+  const legal = useQuery({
+    queryKey: queryKeys.loanLegalActions(loan.id),
+    queryFn: () => endpoints.loanLegalActions(loan.id),
+    enabled: open && court,
+  })
   const principalInput = form.watch('prepaymentPrincipal')
   const principal = principalInput ? Number(principalInput.replace(/[^0-9]/g, '')) || null : null
   const quote = useQuery({
@@ -44,6 +70,11 @@ export function PaymentDialog({ loan }: { loan: LoanDetail }) {
         bankTxId: v.bankTxId || undefined,
         prepayment: v.prepayment,
         prepaymentPrincipal: v.prepaymentPrincipal,
+        channel: v.channel,
+        payerType: v.payerType,
+        payerName: v.payerType === 'CUSTOMER' ? undefined : v.payerName,
+        payerRef: v.payerType === 'CUSTOMER' ? undefined : v.payerRef || undefined,
+        legalActionId: v.legalActionId,
       }),
     onSuccess: async () => {
       await invalidate(loan.id)
@@ -76,11 +107,63 @@ export function PaymentDialog({ loan }: { loan: LoanDetail }) {
             <Field label="거래고유번호 (선택)" htmlFor="bankTxId">
               <Input id="bankTxId" {...form.register('bankTxId')} />
             </Field>
+            <Field label="입금 채널" htmlFor="channel">
+              <Select id="channel" {...form.register('channel')}>
+                {PAYMENT_CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {statusLabel(c)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="입금자 구분" htmlFor="payerType" error={errors.payerType?.message}>
+              <Select id="payerType" {...form.register('payerType')}>
+                {PAYER_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {statusLabel(t)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {payerType !== 'CUSTOMER' && (
+              <>
+                <Field label="실제 입금자 이름 (암호화 저장)" htmlFor="payerName" error={errors.payerName?.message}>
+                  <Input id="payerName" {...form.register('payerName')} />
+                </Field>
+                <Field label="관계·참조 메모 (선택)" htmlFor="payerRef">
+                  <Input id="payerRef" placeholder="예: 연대보증 약정" {...form.register('payerRef')} />
+                </Field>
+              </>
+            )}
+            {court && (
+              <Field label="연결할 법조치 (선택)" htmlFor="legalActionId">
+                <Select id="legalActionId" {...form.register('legalActionId')}>
+                  <option value="">연결 안 함</option>
+                  {legal.data?.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.actionNo} {legalLabel(a.type)} ({legalLabel(a.status)})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </div>
+          {payerType !== 'CUSTOMER' && (
+            <Alert tone="warn">
+              보증인·제3자 입금은 대위변제 기록(구상권 대상 = 입금액)을 남기고, 소멸시효 중단 사유로 세지 않습니다
+              (R49·R50).
+            </Alert>
+          )}
+          {court && (
+            <Alert tone="warn">
+              배당금·공탁금은 일반 입금과 같은 순서(비용 → 이자 → 원금)로 충당하며 소멸시효를 중단하지 않습니다 (R52).
+            </Alert>
+          )}
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" {...form.register('prepayment')} />
             중도상환 요청 (입금일 기준 원금 상환)
           </label>
+          {errors.prepayment?.message && <p className="text-xs text-destructive">{errors.prepayment.message}</p>}
           {prepayment && (
             <div className="space-y-2 rounded border p-2">
               <Field label="상환할 원금 (비우면 전액)" htmlFor="prepaymentPrincipal">

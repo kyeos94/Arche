@@ -30,6 +30,25 @@ export const passwordChangeSchema = z
   })
   .refine((v) => v.newPassword === v.confirm, { path: ['confirm'], message: '새 비밀번호가 일치하지 않습니다' })
 
+export const PAYMENT_CHANNELS = [
+  'BANK_TRANSFER',
+  'VIRTUAL_ACCOUNT',
+  'AUTO_DEBIT',
+  'CASH',
+  'AUCTION_DISTRIBUTION',
+  'COURT_DEPOSIT',
+] as const
+
+/** 입금자 구분 (R49) */
+export const PAYER_TYPES = ['CUSTOMER', 'GUARANTOR', 'THIRD_PARTY'] as const
+
+/** 보증인·제3자 입금은 입금자 이름 필수 (R49) */
+function payerRules(v: { payerType: string; payerName?: string }, ctx: z.RefinementCtx) {
+  if (v.payerType !== 'CUSTOMER' && !v.payerName?.trim()) {
+    ctx.addIssue({ code: 'custom', path: ['payerName'], message: '보증인·제3자 입금은 입금자 이름을 입력하세요' })
+  }
+}
+
 export const paymentSchema = z
   .object({
     bankDate: date,
@@ -38,14 +57,33 @@ export const paymentSchema = z
     bankTxId: z.string().max(40).optional(),
     prepayment: z.boolean().default(false),
     prepaymentPrincipal: z.string().optional(),
+    channel: z.enum(PAYMENT_CHANNELS).default('BANK_TRANSFER'),
+    payerType: z.enum(PAYER_TYPES).default('CUSTOMER'),
+    payerName: z.string().max(50).optional(),
+    payerRef: z.string().max(100).optional(),
+    legalActionId: z.string().optional(),
   })
-  .transform((v) => ({
-    ...v,
-    prepaymentPrincipal:
-      v.prepayment && v.prepaymentPrincipal && v.prepaymentPrincipal.trim() !== ''
-        ? Number(v.prepaymentPrincipal.replace(/[^0-9]/g, ''))
-        : null,
-  }))
+  .superRefine((v, ctx) => payerRules(v, ctx))
+  .superRefine((v, ctx) => {
+    const court = v.channel === 'AUCTION_DISTRIBUTION' || v.channel === 'COURT_DEPOSIT'
+    if (court && v.payerType !== 'CUSTOMER') {
+      ctx.addIssue({ code: 'custom', path: ['payerType'], message: '배당금·공탁금은 입금자 구분이 본인입니다 (R52)' })
+    }
+    if (court && v.prepayment) {
+      ctx.addIssue({ code: 'custom', path: ['prepayment'], message: '배당금·공탁금에는 중도상환 요청을 함께 받지 않습니다' })
+    }
+  })
+  .transform((v) => {
+    const court = v.channel === 'AUCTION_DISTRIBUTION' || v.channel === 'COURT_DEPOSIT'
+    return {
+      ...v,
+      prepaymentPrincipal:
+        v.prepayment && v.prepaymentPrincipal && v.prepaymentPrincipal.trim() !== ''
+          ? Number(v.prepaymentPrincipal.replace(/[^0-9]/g, ''))
+          : null,
+      legalActionId: court && v.legalActionId ? Number(v.legalActionId) : null,
+    }
+  })
 
 export const unmatchedPaymentSchema = z.object({
   bankDate: date,
@@ -125,6 +163,61 @@ export const openLoanSchema = z.object({
   dueDay,
   disbursedOn: z.union([date, z.literal('')]),
   assignedStaffId: z.string().optional(),
+})
+
+/** 일괄 입금 배분 (R47): 새 입금이면 입금일·입금액 필수, 미확인 입금이면 그 금액을 쓴다 */
+export const splitSchema = z
+  .object({
+    method: z.enum(['OLDEST_DELINQUENCY_FIRST', 'PROPORTIONAL', 'MANUAL']),
+    bankDate: z.string().optional(),
+    amount: z.string().optional(),
+    depositorName: z.string().max(50).optional(),
+    bankTxId: z.string().max(40).optional(),
+    payerType: z.enum(PAYER_TYPES).default('CUSTOMER'),
+    payerName: z.string().max(50).optional(),
+    payerRef: z.string().max(100).optional(),
+    fromUnmatched: z.boolean().default(false),
+  })
+  .superRefine((v, ctx) => payerRules(v, ctx))
+  .superRefine((v, ctx) => {
+    if (v.fromUnmatched) return
+    if (!v.bankDate || !/^\d{4}-\d{2}-\d{2}$/.test(v.bankDate)) {
+      ctx.addIssue({ code: 'custom', path: ['bankDate'], message: 'yyyy-MM-dd 형식으로 입력하세요' })
+    }
+    const n = Number((v.amount ?? '').replace(/[^0-9]/g, ''))
+    if (!Number.isInteger(n) || n <= 0) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: '0보다 커야 합니다' })
+    }
+  })
+  .transform((v) => ({ ...v, amount: v.amount ? Number(v.amount.replace(/[^0-9]/g, '')) : undefined }))
+
+/** 법조치 등록 (R51) */
+export const legalActionSchema = z.object({
+  type: z.enum(['PAYMENT_ORDER', 'SEIZURE', 'AUCTION']),
+  filedOn: date,
+  courtName: z.string().max(100).optional(),
+  caseRef: z.string().max(50).optional(),
+  targetDesc: z.string().max(200).optional(),
+  claimAmount: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== '' ? Number(v.replace(/[^0-9]/g, '')) : null)),
+  memo: z.string().max(500).optional(),
+})
+
+/** 법조치 단계 변경 (R51) */
+export const legalStageSchema = z.object({
+  stage: z.string().min(1, '단계를 고르세요'),
+  date,
+  memo: z.string().max(200).optional(),
+})
+
+/** 법조치 비용 (R52) */
+export const legalCostSchema = z.object({
+  costType: z.enum(['COURT_FEE', 'SERVICE_FEE', 'EXECUTION_FEE', 'AGENT_FEE', 'OTHER']),
+  amount: money,
+  incurredOn: date,
+  memo: z.string().max(200).optional(),
 })
 
 export type LoginForm = z.infer<typeof loginSchema>
