@@ -26,7 +26,10 @@ class JdbcServicingReports implements ServicingReports {
 	private final JdbcClient jdbc;
 	private final Customers customers;
 
-	JdbcServicingReports(JdbcClient jdbc, Customers customers) {
+	private final LoanQuery loanQuery;
+
+	JdbcServicingReports(JdbcClient jdbc, Customers customers, LoanQuery loanQuery) {
+		this.loanQuery = loanQuery;
 		this.jdbc = jdbc;
 		this.customers = customers;
 	}
@@ -81,53 +84,9 @@ class JdbcServicingReports implements ServicingReports {
 
 	/** LoanController.list와 같은 조건: 주민등록번호 형식이면 고객 일치, 아니면 계약번호 부분 일치 */
 	@Override
-	public void forEachLoan(@Nullable String status, @Nullable String q, DataScope scope,
-			Consumer<LoanListRow> consumer) {
-		String statusFilter = status == null ? "" : status.trim();
-		String accountNo = "";
-		Optional<Long> customerId = Optional.empty();
-		boolean customerFilter = false;
-		if (q != null && !q.isBlank()) {
-			if (q.matches("[0-9]{6}-?[0-9]{7}")) {
-				customerFilter = true;
-				customerId = customers.findByResidentNo(q).map(c -> c.id());
-				if (customerId.isEmpty()) {
-					return;
-				}
-			} else {
-				accountNo = q.trim();
-			}
-		}
-		boolean all = scope.kind() == DataScope.Kind.ALL;
-		Set<Long> staffIds = all || scope.staffIds() == null || scope.staffIds().isEmpty() ? Set.of(-1L)
-				: scope.staffIds();
-		long after = Long.MAX_VALUE;
-		while (true) {
-			List<LoanListRow> page = new ArrayList<>(jdbc.sql("""
-					select id, account_no, customer_id, product_code, status, principal_balance, payoff_amount,
-					       delinquency_days, next_due_date, assigned_staff_id
-					from loan_account
-					where id < :after
-					  and (:status = '' or status = :status)
-					  and (:all or assigned_staff_id in (:staffIds))
-					  and account_no like ('%' || :accountNo || '%')
-					  and (not :customerFilter or customer_id = :customerId)
-					order by id desc
-					limit :limit
-					""").param("after", after).param("status", statusFilter).param("all", all)
-					.param("staffIds", staffIds).param("accountNo", accountNo).param("customerFilter", customerFilter)
-					.param("customerId", customerId.orElse(-1L)).param("limit", PAGE)
-					.query((rs, n) -> new LoanListRow(rs.getLong("id"), rs.getString("account_no"),
-							rs.getLong("customer_id"), rs.getString("product_code"), rs.getString("status"),
-							rs.getLong("principal_balance"), rs.getLong("payoff_amount"),
-							rs.getInt("delinquency_days"), rs.getObject("next_due_date", LocalDate.class),
-							rs.getObject("assigned_staff_id", Long.class)))
-					.list());
-			page.forEach(consumer);
-			if (page.size() < PAGE) {
-				return;
-			}
-			after = page.getLast().id();
-		}
+	public void forEachLoan(dev.arche.servicing.LoanFilter filter, DataScope scope, Consumer<LoanListRow> consumer) {
+		loanQuery.forEach(filter, scope, PAGE, r -> consumer.accept(new LoanListRow(r.id(), r.accountNo(), r.customerId(),
+				r.productCode(), r.status(), r.principalBalance(), r.payoffAmount(), r.delinquencyDays(), r.nextDueDate(),
+				r.assignedStaffId())));
 	}
 }

@@ -1,5 +1,9 @@
 package dev.arche.servicing.internal;
 
+import org.springframework.web.bind.annotation.ModelAttribute;
+
+import dev.arche.servicing.LoanFilter;
+
 import dev.arche.calendar.BusinessDates;
 import dev.arche.common.BusinessException;
 import dev.arche.common.InterestRate;
@@ -59,7 +63,32 @@ class LoanController {
 
 	record ListItem(long id, String accountNo, String customerName, String productCode, String status,
 			long principalBalance, long payoffAmount, int delinquencyDays, LocalDate nextDueDate,
-			Long assignedStaffId) {
+			Long assignedStaffId, String assignedStaffName, long initialPrincipal, LocalDate disbursedOn) {
+	}
+
+	/**
+	 * 계약 목록 검색 조건 (ADR 0011). 쿼리스트링 이름 그대로 받는다. q는 예전 검색창(계약번호 또는 주민등록번호).
+	 * sort는 LoanQuery.SORT_COLUMNS의 키, dir은 asc/desc
+	 */
+	record ListQuery(String status, String productCode, Long assignedStaffId, Boolean unassigned, Long principalMin,
+			Long principalMax, Long payoffMin, Long payoffMax, Integer delinquencyMin, Integer delinquencyMax,
+			LocalDate nextDueFrom, LocalDate nextDueTo, LocalDate disbursedFrom, LocalDate disbursedTo,
+			String keywordType, String keyword, String q, Integer page, Integer size, String sort, String dir) {
+
+		LoanFilter filter() {
+			boolean legacy = (keyword == null || keyword.isBlank()) && q != null && !q.isBlank();
+			return new LoanFilter(status, productCode, assignedStaffId, Boolean.TRUE.equals(unassigned), principalMin,
+					principalMax, payoffMin, payoffMax, delinquencyMin, delinquencyMax, nextDueFrom, nextDueTo,
+					disbursedFrom, disbursedTo, legacy ? "AUTO" : keywordType, legacy ? q : keyword);
+		}
+
+		@Override
+		public String toString() {
+			return "ListQuery[" + filter() + "]";
+		}
+	}
+
+	record Assignee(long id, String name, String roleLabel, String team) {
 	}
 
 	record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {
@@ -177,12 +206,14 @@ class LoanController {
 	private final StaffDirectory staff;
 	private final AccessLogger accessLog;
 	private final BusinessDates businessDates;
+	private final LoanQuery loanQuery;
 
 	LoanController(LoanAccountRepository accounts, RateTermRepository rateTerms, DueDayTermRepository dueDayTerms,
 			InstallmentRepository installments, LedgerEntryRepository ledger, AccelerationNoticeRepository notices,
 			AccountEventRepository events, AcquisitionRepository acquisitions, AccountReplayer replayer,
 			LoanAccountService service, LimitationService limitationService, Customers customers, AccessLogger accessLog, ProductCatalog products, StaffDirectory staff,
-			BusinessDates businessDates) {
+			BusinessDates businessDates, LoanQuery loanQuery) {
+		this.loanQuery = loanQuery;
 		this.accounts = accounts;
 		this.rateTerms = rateTerms;
 		this.dueDayTerms = dueDayTerms;
@@ -206,28 +237,38 @@ class LoanController {
 	@GetMapping
 	@PreAuthorize("hasAuthority('loan.read')")
 	@Transactional(readOnly = true)
-	PageResponse<ListItem> list(@RequestParam(required = false) String status,
-			@RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "50") int size) {
-		DataScope scope = staff.loanScope();
-		boolean all = scope.kind() == DataScope.Kind.ALL;
-		Set<Long> staffIds = all ? Set.of(-1L) : nonEmpty(scope.staffIds());
-		String accountNo = "";
-		Set<Long> customerIds = Set.of(-1L);
-		boolean noCustomerFilter = true;
-		if (q != null && !q.isBlank()) {
-			if (q.matches("[0-9]{6}-?[0-9]{7}")) {
-				noCustomerFilter = false;
-				customerIds = customers.findByResidentNo(q).map(c -> Set.of(c.id())).orElse(Set.of(-1L));
-			} else {
-				accountNo = q.trim();
-			}
+	PageResponse<ListItem> list(@ModelAttribute ListQuery query) {
+		LoanFilter filter = query.filter();
+		if (filter.identifierSearch()) {
+			// 주민등록번호·휴대폰으로 찾은 사실만 남기고 입력값은 남기지 않는다
+			accessLog.log("LOAN_LIST_IDENTIFIER_SEARCH", "LOAN_LIST", filter.keywordType(), null);
 		}
-		Page<LoanAccount> result = accounts.search(status == null ? "" : status.trim(), all, staffIds, accountNo, noCustomerFilter,
-				customerIds, PageRequest.of(page, Math.min(size, 200), Sort.by(Sort.Direction.DESC, "id")));
-		return PageResponse.of(result.map(a -> new ListItem(a.getId(), a.accountNo(),
-				customers.get(a.customerId()).name(), a.productCode(), a.status().name(), a.principalBalance(),
-				a.payoffAmount(), a.delinquencyDays(), a.nextDueDate(), a.assignedStaffId())));
+		int page = query.page() == null ? 0 : Math.max(query.page(), 0);
+		int size = query.size() == null ? 50 : query.size();
+		LoanQuery.Page result = loanQuery.page(filter, staff.loanScope(), page, size, query.sort(),
+				"desc".equalsIgnoreCase(query.dir()));
+		int pageSize = LoanQuery.PAGE_SIZES.contains(size) ? size : 50;
+		Map<Long, String> names = new java.util.HashMap<>();
+		List<ListItem> items = result.rows().stream().map(r -> new ListItem(r.id(), r.accountNo(),
+				customers.get(r.customerId()).name(), r.productCode(), r.status(), r.principalBalance(),
+				r.payoffAmount(), r.delinquencyDays(), r.nextDueDate(), r.assignedStaffId(),
+				r.assignedStaffId() == null ? null
+						: names.computeIfAbsent(r.assignedStaffId(),
+								id -> staff.byId(id).map(dev.arche.staff.CurrentStaff::name).orElse("#" + id)),
+				r.initialPrincipal(), r.disbursedOn())).toList();
+		return new PageResponse<>(items, page, pageSize, result.total(),
+				(int) ((result.total() + pageSize - 1) / pageSize));
+	}
+
+	/** 담당자 검색 목록: 계약을 맡을 수 있는 재직 직원(채권담당·채권팀장) */
+	@GetMapping("/assignees")
+	@PreAuthorize("hasAuthority('loan.read')")
+	List<Assignee> assignees() {
+		Map<Long, String> teams = staff.teamNames();
+		return staff.active().stream()
+				.filter(s -> s.role() == dev.arche.staff.Role.COLLECTOR || s.role() == dev.arche.staff.Role.COLLECTION_LEAD)
+				.map(s -> new Assignee(s.id(), s.name(), s.role().label(), s.teamId() == null ? null : teams.get(s.teamId())))
+				.toList();
 	}
 
 	@GetMapping("/status-counts")

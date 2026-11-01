@@ -57,6 +57,25 @@ class CommunicationController {
 	record MemoRequest(@NotBlank @Size(max = 1000) String body) {
 	}
 
+	/** 문자 일괄 발송 (ADR 0011). 템플릿 또는 직접 입력 중 하나 */
+	record BulkSmsRequest(@NotNull @Size(min = 1, max = BULK_MAX) List<Long> accountIds, Long templateId,
+			@Size(max = 2000) String body) {
+
+		@Override
+		public String toString() {
+			return "BulkSmsRequest[" + accountIds.size() + "건, template " + templateId + "]";
+		}
+	}
+
+	/** 계약별 결과: SENT(발송), SCHEDULED(야간이라 예약), BLOCKED(한도·유예 등으로 차단, 기록은 남음), SKIPPED(보내지 않음) */
+	record BulkSmsItem(long accountId, String accountNo, String result, String reason) {
+	}
+
+	record BulkSmsResult(int sent, int scheduled, int blocked, int skipped, List<BulkSmsItem> items) {
+	}
+
+	static final int BULK_MAX = 200;
+
 	record TemplateRequest(@NotBlank @Pattern(regexp = "[A-Z0-9_]{2,30}") String code, @NotBlank @Size(max = 60) String name,
 			@NotNull DispatchChannel channel, @NotNull DispatchPurpose purpose, @Size(max = 100) String title,
 			@NotBlank @Size(max = 2000) String body, Boolean active) {
@@ -149,6 +168,41 @@ class CommunicationController {
 		CommunicationDispatch d = service.send(account, new CommunicationService.SendCommand(body.channel(),
 				body.templateId(), body.title(), body.body(), body.faxNumber()));
 		return dto(d);
+	}
+
+	/**
+	 * 문자 일괄 발송 (ADR 0011): 계약마다 상세 화면의 문자 발송과 같은 규칙(7일 7회·연락 유예·추심 중지·야간 예약·완제 계약 제외)을
+	 * 따로 적용한다. 계약마다 별도 트랜잭션이라 한 건이 막혀도 나머지는 보낸다. 담당 범위 밖 계약은 건너뛴다
+	 */
+	@PostMapping("/dispatches/bulk-sms")
+	@PreAuthorize("hasAuthority('collection.activity')")
+	BulkSmsResult bulkSms(@Valid @RequestBody BulkSmsRequest body) {
+		List<BulkSmsItem> items = new java.util.ArrayList<>();
+		int sent = 0;
+		int scheduled = 0;
+		int blocked = 0;
+		int skipped = 0;
+		for (Long id : new java.util.LinkedHashSet<>(body.accountIds())) {
+			String accountNo = null;
+			try {
+				AccountRef account = access.visible(id);
+				accountNo = account.accountNo();
+				CommunicationDispatch d = service.send(account, new CommunicationService.SendCommand(DispatchChannel.SMS,
+						body.templateId(), null, body.body(), null));
+				String result = d.status().name();
+				switch (d.status()) {
+					case SENT -> sent++;
+					case SCHEDULED -> scheduled++;
+					// 기관 처리 실패(FAILED)도 받지 못했으므로 차단과 같이 센다
+					default -> blocked++;
+				}
+				items.add(new BulkSmsItem(id, accountNo, result, d.blockReason()));
+			} catch (dev.arche.common.BusinessException e) {
+				skipped++;
+				items.add(new BulkSmsItem(id, accountNo, "SKIPPED", e.getMessage()));
+			}
+		}
+		return new BulkSmsResult(sent, scheduled, blocked, skipped, items);
 	}
 
 	@GetMapping("/loans/{id}/dispatches")

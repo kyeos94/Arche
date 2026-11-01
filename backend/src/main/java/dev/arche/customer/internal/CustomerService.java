@@ -23,10 +23,23 @@ interface CustomerRepository extends JpaRepository<Customer, Long> {
 	List<Customer> findTop50ByNameContainingOrderById(String name);
 
 	List<Customer> findByPhoneBlindIndexIsNullAndPhoneIsNotNull();
+
+	@org.springframework.data.jpa.repository.Query("select c.id from Customer c where c.residentNoBlindIndex = :i")
+	List<Long> idsByResidentIndex(@org.springframework.data.repository.query.Param("i") String blindIndex);
+
+	@org.springframework.data.jpa.repository.Query("select c.id from Customer c where c.phoneBlindIndex = :i order by c.id")
+	List<Long> idsByPhoneIndex(@org.springframework.data.repository.query.Param("i") String blindIndex,
+			org.springframework.data.domain.Pageable page);
+
+	@org.springframework.data.jpa.repository.Query("select c.id from Customer c where c.name like concat('%', :n, '%') order by c.id")
+	List<Long> idsByName(@org.springframework.data.repository.query.Param("n") String name,
+			org.springframework.data.domain.Pageable page);
 }
 
 @Service
 class CustomerService implements Customers {
+
+	static final int ID_MATCH_LIMIT = 5_000;
 
 	private final CustomerRepository customers;
 	private final BlindIndexer indexer;
@@ -77,6 +90,21 @@ class CustomerService implements Customers {
 					.toList();
 			case NAME -> q.length() < 2 ? List.of()
 					: customers.findTop50ByNameContainingOrderById(q).stream().map(Customer::view).toList();
+		};
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Long> idsMatching(SearchKind kind, String query) {
+		String q = query == null ? "" : query.trim();
+		if (q.isEmpty()) {
+			return List.of();
+		}
+		var limit = org.springframework.data.domain.PageRequest.of(0, ID_MATCH_LIMIT);
+		return switch (kind) {
+			case RESIDENT_NO -> customers.idsByResidentIndex(indexer.index(q));
+			case PHONE -> customers.idsByPhoneIndex(indexer.index(q), limit);
+			case NAME -> customers.idsByName(q, limit);
 		};
 	}
 

@@ -1,5 +1,7 @@
 package dev.arche.reporting.internal;
 
+import dev.arche.servicing.LoanFilter;
+
 import dev.arche.calendar.BusinessDates;
 import dev.arche.common.BusinessException;
 import dev.arche.customer.CustomerView;
@@ -38,8 +40,17 @@ class ExportController {
 	static final String ACTION = "EXCEL_DOWNLOAD";
 
 	/** 계약 목록과 같은 검색 조건 */
-	record LoanExportRequest(@Nullable String status, @Nullable String q,
+	record LoanExportRequest(@Nullable LoanFilter filter, @Nullable String status, @Nullable String q,
 			@NotBlank @Size(min = 2, max = 200) String reason) {
+
+		/** 예전 요청(status, q)도 받는다 */
+		LoanFilter effective() {
+			if (filter != null) {
+				return filter;
+			}
+			return new LoanFilter(status, null, null, false, null, null, null, null, null, null, null, null, null,
+					null, q == null || q.isBlank() ? null : "AUTO", q);
+		}
 	}
 
 	enum ReportKind {
@@ -73,17 +84,18 @@ class ExportController {
 	void loans(@Valid @RequestBody LoanExportRequest request, HttpServletResponse response) throws IOException {
 		requireReason(request.reason());
 		DataScope scope = staff.loanScope();
-		String status = request.status() == null || request.status().isBlank() ? null : request.status().trim();
-		boolean hasQuery = request.q() != null && !request.q().isBlank();
-		// 검색어 원문은 주민등록번호일 수 있어 남기지 않는다
-		accessLog.log(ACTION, "LOAN_LIST", "status=" + (status == null ? "ALL" : status) + (hasQuery ? ",q" : ""),
+		LoanFilter filter = request.effective();
+		// 검색어 원문은 주민등록번호일 수 있어 남기지 않는다 (LoanFilter.toString도 검색어를 빼고 쓴다)
+		String target = "status=" + (filter.status() == null || filter.status().isBlank() ? "ALL" : filter.status())
+				+ (filter.keyword() == null || filter.keyword().isBlank() ? "" : ",keyword");
+		accessLog.log(ACTION, "LOAN_LIST", target.length() > 50 ? target.substring(0, 50) : target,
 				request.reason().trim());
 		start(response, "loans-" + businessDates.today() + ".xlsx");
 		Map<Long, CustomerView> cache = new HashMap<>();
 		try (XlsxWriter w = new XlsxWriter()) {
 			w.sheet("계약 목록").header("계약번호", "고객명", "주민등록번호", "휴대폰", "상품", "상태", "원금 잔액", "완제 금액", "연체일수",
 					"다음 납입일", "담당자 ID");
-			servicing.forEachLoan(status, request.q(), scope, row -> {
+			servicing.forEachLoan(filter, scope, row -> {
 				CustomerView c = cache.computeIfAbsent(row.customerId(), customers::get);
 				w.row(row.accountNo(), maskName(c.name()), c.residentNoMasked(), c.phoneMasked(), row.productCode(),
 						ReportLabels.status(row.status()), row.principalBalance(), row.payoffAmount(),

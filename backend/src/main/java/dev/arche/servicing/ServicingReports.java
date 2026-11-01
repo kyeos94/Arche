@@ -57,8 +57,8 @@ public interface ServicingReports {
 	}
 
 	/**
-	 * 계약 목록 화면과 같은 검색 조건(상태, 검색어 = 계약번호 부분 일치 또는 주민등록번호 일치)과 데이터 범위로 계약을 id 역순으로 순회한다.
+	 * 계약 목록 화면과 같은 검색 조건(ADR 0011 LoanFilter)과 데이터 범위로 계약을 id 역순으로 순회한다.
 	 * 한 번에 다 읽지 않고 나눠 읽는다(스트리밍 다운로드).
 	 */
-	void forEachLoan(@Nullable String status, @Nullable String q, DataScope scope, Consumer<LoanListRow> consumer);
+	void forEachLoan(LoanFilter filter, DataScope scope, Consumer<LoanListRow> consumer);
 }

@@ -35,6 +35,12 @@ public interface Customers {
 	 */
 	List<CustomerView> search(String query);
 
+	/**
+	 * 계약 목록 상세 검색용 고객 ID (ADR 0011). 주민등록번호·휴대폰은 블라인드 인덱스 일치, 이름은 부분 일치(1자 이상).
+	 * 최대 5,000명. 식별번호 원문은 남기지 않는다
+	 */
+	List<Long> idsMatching(SearchKind kind, String query);
+
 	/** 입력값이 어떤 검색인지 (주민등록번호·휴대폰번호가 아니면 이름) */
 	static SearchKind kindOf(String query) {
 		String digits = query.replaceAll("[^0-9]", "");
