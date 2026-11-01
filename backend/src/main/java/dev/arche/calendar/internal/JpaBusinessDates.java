@@ -7,10 +7,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.Cacheable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.LockModeType;
@@ -23,20 +24,27 @@ interface BusinessDateRepository extends JpaRepository<BusinessDateRow, Short> {
 }
 
 interface HolidayRepository extends JpaRepository<HolidayRow, LocalDate> {
+
+	java.util.List<HolidayRow> findByHolidayDateBetweenOrderByHolidayDate(LocalDate from, LocalDate to);
 }
 
 @Service
 class JpaBusinessDates implements BusinessDates {
 
-	static final String CALENDAR_CACHE = "business-calendar";
+	/** 달력과 그 달력을 읽을 때의 휴일 변경 이력 버전 */
+	private record Snapshot(long version, BusinessCalendar calendar) {
+	}
 
 	private final BusinessDateRepository dates;
 	private final HolidayRepository holidays;
+	private final JdbcClient jdbc;
 	private final Clock clock;
+	private volatile @Nullable Snapshot snapshot;
 
-	JpaBusinessDates(BusinessDateRepository dates, HolidayRepository holidays, Clock clock) {
+	JpaBusinessDates(BusinessDateRepository dates, HolidayRepository holidays, JdbcClient jdbc, Clock clock) {
 		this.dates = dates;
 		this.holidays = holidays;
+		this.jdbc = jdbc;
 		this.clock = clock;
 	}
 
@@ -46,11 +54,22 @@ class JpaBusinessDates implements BusinessDates {
 		return dates.findById((short) 1).orElseThrow().currentDate();
 	}
 
+	/**
+	 * 휴일 달력. 메모리에 두되, 휴일 변경 이력(holiday_change_log)의 마지막 id가 바뀌었으면 다시 읽는다 (R73).
+	 * 그래서 휴일 관리에서 바꾼 휴일은 서버가 여러 대여도 다음 계산(입금 충당·일마감 재생)부터 쓰인다.
+	 * 버전 확인은 기본키 최댓값 조회 한 번이라 계약마다 불러도 가볍다.
+	 */
 	@Override
-	@Cacheable(CALENDAR_CACHE)
 	@Transactional(readOnly = true)
 	public BusinessCalendar calendar() {
-		return new BusinessCalendar(holidays.findAll().stream().map(HolidayRow::date).collect(Collectors.toSet()));
+		long version = jdbc.sql("select coalesce(max(id), 0) from holiday_change_log").query(Long.class).single();
+		Snapshot s = snapshot;
+		if (s == null || s.version() != version) {
+			s = new Snapshot(version,
+					new BusinessCalendar(holidays.findAll().stream().map(HolidayRow::date).collect(Collectors.toSet())));
+			snapshot = s;
+		}
+		return s.calendar();
 	}
 
 	@Override

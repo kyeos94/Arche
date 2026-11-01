@@ -19,7 +19,16 @@ class HolidayRow {
 	protected HolidayRow() {
 	}
 
+	HolidayRow(LocalDate holidayDate, String name) {
+		this.holidayDate = holidayDate;
+		this.name = name;
+	}
+
 	LocalDate date() {
 		return holidayDate;
+	}
+
+	String name() {
+		return name;
 	}
 }
