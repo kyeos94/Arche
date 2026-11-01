@@ -4,8 +4,9 @@ import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime, statusLabel } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 /** 추심 알림: 소멸시효 임박·완성(G13), 분할납부 약속 불이행·해제(G19). 일마감에서 만든다 */
@@ -20,6 +21,12 @@ export function AlertsPage() {
     mutationFn: (id: number) => endpoints.readAlert(id),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.alerts }),
   })
+  const { sorted, header } = useSort(q.data, {
+    alertDate: (a) => a.alertDate,
+    type: (a) => statusLabel(a.type),
+    message: (a) => a.message,
+    readAt: (a) => a.readAt,
+  })
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -33,16 +40,16 @@ export function AlertsPage() {
       <Table>
         <THead>
           <TR>
-            <TH>알림일</TH>
-            <TH>유형</TH>
-            <TH>내용</TH>
+            <SortTH {...header('alertDate')}>알림일</SortTH>
+            <SortTH {...header('type')}>유형</SortTH>
+            <SortTH {...header('message')}>내용</SortTH>
             <TH>계약</TH>
-            <TH>읽음</TH>
+            <SortTH {...header('readAt')}>읽음</SortTH>
           </TR>
         </THead>
         <TBody>
           {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
-          {q.data?.map((a) => (
+          {sorted.map((a) => (
             <TR key={a.id} className={cn(a.readAt && 'text-muted-foreground')}>
               <TD>{formatDate(a.alertDate)}</TD>
               <TD>{statusLabel(a.type)}</TD>

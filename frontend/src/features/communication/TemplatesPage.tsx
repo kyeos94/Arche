@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { useSort } from '@/lib/useSort'
 import { type MessageTemplate, sliceApi, sliceKeys, sliceLabel } from './api'
 import { PLACEHOLDERS, templateSchema } from './schemas'
 
@@ -33,6 +34,13 @@ export function TemplatesPage() {
   })
   const errors = form.formState.errors
   const channel = form.watch('channel')
+  const { sorted, header } = useSort(q.data, {
+    code: (t) => t.code,
+    name: (t) => t.name,
+    channel: (t) => sliceLabel(t.channel),
+    purpose: (t) => sliceLabel(t.purpose),
+    status: (t) => (t.active ? '사용' : '중지'),
+  })
 
   function edit(t: MessageTemplate) {
     setEditing(t)
@@ -121,18 +129,18 @@ export function TemplatesPage() {
           <Table>
             <THead>
               <TR>
-                <TH>코드</TH>
-                <TH>이름</TH>
-                <TH>수단</TH>
-                <TH>목적</TH>
+                <SortTH {...header('code')}>코드</SortTH>
+                <SortTH {...header('name')}>이름</SortTH>
+                <SortTH {...header('channel')}>수단</SortTH>
+                <SortTH {...header('purpose')}>목적</SortTH>
                 <TH>내용</TH>
-                <TH>상태</TH>
+                <SortTH {...header('status')}>상태</SortTH>
                 <TH />
               </TR>
             </THead>
             <TBody>
               {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-              {q.data?.map((t) => (
+              {sorted.map((t) => (
                 <TR key={t.id}>
                   <TD className="font-mono">{t.code}</TD>
                   <TD>{t.name}</TD>

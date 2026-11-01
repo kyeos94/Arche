@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatMoney, legalLabel } from '@/lib/format'
 import { legalActionSchema, legalCostSchema, legalStageSchema } from '@/lib/schemas'
+import { useSort } from '@/lib/useSort'
 
 const TERMINAL = ['CLOSED', 'WITHDRAWN', 'DISMISSED', 'RELEASED']
 
@@ -64,6 +65,13 @@ function useInvalidateLegal(loanId: number) {
 }
 
 function LegalActionCard({ action: a, loan }: { action: LegalAction; loan: LoanDetail }) {
+  // 단계 표는 진행 순서 자체가 의미이므로 정렬하지 않고, 비용 표만 정렬한다
+  const { sorted: costs, header } = useSort(a.costs, {
+    costType: (c) => legalLabel(c.costType),
+    amount: (c) => c.amount,
+    incurredOn: (c) => c.incurredOn,
+    chargedOn: (c) => c.chargedOn,
+  })
   return (
     <Card>
       <CardHeader>
@@ -114,15 +122,17 @@ function LegalActionCard({ action: a, loan }: { action: LegalAction; loan: LoanD
           <Table>
             <THead>
               <TR>
-                <TH>비용</TH>
-                <TH className="text-right">금액</TH>
-                <TH>발생일</TH>
-                <TH>적재일</TH>
+                <SortTH {...header('costType')}>비용</SortTH>
+                <SortTH {...header('amount')} className="text-right">
+                  금액
+                </SortTH>
+                <SortTH {...header('incurredOn')}>발생일</SortTH>
+                <SortTH {...header('chargedOn')}>적재일</SortTH>
               </TR>
             </THead>
             <TBody>
               {a.costs.length === 0 && <EmptyRow colSpan={4} />}
-              {a.costs.map((c) => (
+              {costs.map((c) => (
                 <TR key={c.id}>
                   <TD>
                     {legalLabel(c.costType)}

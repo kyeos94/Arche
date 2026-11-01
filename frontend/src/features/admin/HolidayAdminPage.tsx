@@ -6,8 +6,9 @@ import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -236,6 +237,14 @@ function HolidayChanges() {
     queryKey: adminConsoleKeys.holidayChanges,
     queryFn: () => adminConsole.holidayChanges(100),
   })
+  const { sorted, header } = useSort(changes.data, {
+    changedAt: (c) => c.changedAt,
+    businessDate: (c) => c.businessDate,
+    date: (c) => c.date,
+    action: (c) => (c.action === 'ADD' ? '휴일 지정' : '휴일 해제'),
+    name: (c) => c.name,
+    changedBy: (c) => c.changedBy,
+  })
   return (
     <Card>
       <CardHeader>
@@ -246,17 +255,17 @@ function HolidayChanges() {
         <Table>
           <THead>
             <TR>
-              <TH>일시</TH>
-              <TH>업무일자</TH>
-              <TH>날짜</TH>
-              <TH>변경</TH>
-              <TH>휴일 이름</TH>
-              <TH>변경한 직원</TH>
+              <SortTH {...header('changedAt')}>일시</SortTH>
+              <SortTH {...header('businessDate')}>업무일자</SortTH>
+              <SortTH {...header('date')}>날짜</SortTH>
+              <SortTH {...header('action')}>변경</SortTH>
+              <SortTH {...header('name')}>휴일 이름</SortTH>
+              <SortTH {...header('changedBy')}>변경한 직원</SortTH>
             </TR>
           </THead>
           <TBody>
             {changes.data?.length === 0 && <EmptyRow colSpan={6}>바꾼 휴일이 없습니다</EmptyRow>}
-            {changes.data?.map((c) => (
+            {sorted.map((c) => (
               <TR key={c.id}>
                 <TD className="whitespace-nowrap">{formatDateTime(c.changedAt)}</TD>
                 <TD>{formatDate(c.businessDate)}</TD>

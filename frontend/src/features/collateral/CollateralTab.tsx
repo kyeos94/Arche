@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { Can } from '@/features/auth/auth'
 import { type Collateral, sliceApi, sliceKeys, sliceLabel, sliceTones } from '@/features/communication/api'
 import { collateralSchema, guarantorSchema } from '@/features/communication/schemas'
 import { formatDate, formatMoney } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 
 /** 시세표의 차종 구분 (Mock 고정 시세표, ADR 0008) */
@@ -38,6 +39,17 @@ function CollateralCard({ loan }: { loan: LoanDetail }) {
     onSuccess: refresh,
   })
   const s = q.data?.summary
+  const { sorted, header } = useSort(q.data?.collaterals, {
+    type: (c) => sliceLabel(c.type),
+    description: (c) => c.description,
+    identifier: (c) => c.identifier,
+    seniorClaim: (c) => c.seniorClaim,
+    lienAmount: (c) => c.lienAmount,
+    price: (c) => c.latest?.price,
+    valuedOn: (c) => c.latest?.valuedOn,
+    recognizedValue: (c) => c.recognizedValue,
+    status: (c) => sliceLabel(c.status),
+  })
   return (
     <Card>
       <CardHeader>
@@ -69,21 +81,29 @@ function CollateralCard({ loan }: { loan: LoanDetail }) {
         <Table>
           <THead>
             <TR>
-              <TH>유형</TH>
-              <TH>설명</TH>
-              <TH>식별</TH>
-              <TH className="text-right">선순위</TH>
-              <TH className="text-right">근저당 설정액</TH>
-              <TH className="text-right">최근 시세</TH>
-              <TH>조회일</TH>
-              <TH className="text-right">인정가액</TH>
-              <TH>상태</TH>
+              <SortTH {...header('type')}>유형</SortTH>
+              <SortTH {...header('description')}>설명</SortTH>
+              <SortTH {...header('identifier')}>식별</SortTH>
+              <SortTH {...header('seniorClaim')} className="text-right">
+                선순위
+              </SortTH>
+              <SortTH {...header('lienAmount')} className="text-right">
+                근저당 설정액
+              </SortTH>
+              <SortTH {...header('price')} className="text-right">
+                최근 시세
+              </SortTH>
+              <SortTH {...header('valuedOn')}>조회일</SortTH>
+              <SortTH {...header('recognizedValue')} className="text-right">
+                인정가액
+              </SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
               <TH />
             </TR>
           </THead>
           <TBody>
             {q.data?.collaterals.length === 0 && <EmptyRow colSpan={10}>등록된 담보가 없습니다</EmptyRow>}
-            {q.data?.collaterals.map((c) => (
+            {sorted.map((c) => (
               <CollateralRow
                 key={c.id}
                 c={c}
@@ -259,6 +279,13 @@ function GuarantorCard({ loan }: { loan: LoanDetail }) {
     },
   })
   const e = form.formState.errors
+  const { sorted, header } = useSort(q.data, {
+    name: (g) => g.name,
+    relation: (g) => g.relation,
+    guaranteeLimit: (g) => g.guaranteeLimit,
+    period: (g) => g.startDate,
+    status: (g) => sliceLabel(g.status),
+  })
   return (
     <Card>
       <CardHeader>
@@ -269,19 +296,21 @@ function GuarantorCard({ loan }: { loan: LoanDetail }) {
         <Table>
           <THead>
             <TR>
-              <TH>이름</TH>
+              <SortTH {...header('name')}>이름</SortTH>
               <TH>주민등록번호</TH>
               <TH>연락처</TH>
-              <TH>관계</TH>
-              <TH className="text-right">보증 한도</TH>
-              <TH>보증 기간</TH>
-              <TH>상태</TH>
+              <SortTH {...header('relation')}>관계</SortTH>
+              <SortTH {...header('guaranteeLimit')} className="text-right">
+                보증 한도
+              </SortTH>
+              <SortTH {...header('period')}>보증 기간</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
               <TH />
             </TR>
           </THead>
           <TBody>
             {q.data?.length === 0 && <EmptyRow colSpan={8}>등록된 보증인이 없습니다</EmptyRow>}
-            {q.data?.map((g) => (
+            {sorted.map((g) => (
               <TR key={g.id} className={cn(g.status !== 'ACTIVE' && 'text-muted-foreground')}>
                 <TD>{g.name}</TD>
                 <TD className="font-mono">{g.residentNoMasked}</TD>

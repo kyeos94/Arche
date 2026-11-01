@@ -4,8 +4,9 @@ import { endpoints, queryKeys } from '@/api/endpoints'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 
 function Closing() {
   const client = useQueryClient()
@@ -18,6 +19,18 @@ function Closing() {
     },
   })
   const dispatch = useMutation({ mutationFn: endpoints.dispatchMessages })
+  const { sorted, header } = useSort(closings.data, {
+    businessDate: (c) => c.businessDate,
+    closedAt: (c) => c.closedAt,
+    paymentCount: (c) => c.paymentCount,
+    paymentTotal: (c) => c.paymentTotal,
+    correctionTotal: (c) => c.correctionTotal,
+    unmatchedTotal: (c) => c.unmatchedTotal,
+    accountsJudged: (c) => c.accountsJudged,
+    newNotices: (c) => c.newNotices,
+    accelerations: (c) => c.accelerations,
+    mismatches: (c) => c.mismatches,
+  })
   return (
     <Card>
       <CardHeader>
@@ -57,21 +70,37 @@ function Closing() {
         <Table>
           <THead>
             <TR>
-              <TH>업무일자</TH>
-              <TH>마감 시각</TH>
-              <TH className="text-right">입금 건수</TH>
-              <TH className="text-right">입금 합계</TH>
-              <TH className="text-right">정정</TH>
-              <TH className="text-right">미확인 잔액</TH>
-              <TH className="text-right">판정</TH>
-              <TH className="text-right">새 통지</TH>
-              <TH className="text-right">상실</TH>
-              <TH className="text-right">대사 불일치</TH>
+              <SortTH {...header('businessDate')}>업무일자</SortTH>
+              <SortTH {...header('closedAt')}>마감 시각</SortTH>
+              <SortTH {...header('paymentCount')} className="text-right">
+                입금 건수
+              </SortTH>
+              <SortTH {...header('paymentTotal')} className="text-right">
+                입금 합계
+              </SortTH>
+              <SortTH {...header('correctionTotal')} className="text-right">
+                정정
+              </SortTH>
+              <SortTH {...header('unmatchedTotal')} className="text-right">
+                미확인 잔액
+              </SortTH>
+              <SortTH {...header('accountsJudged')} className="text-right">
+                판정
+              </SortTH>
+              <SortTH {...header('newNotices')} className="text-right">
+                새 통지
+              </SortTH>
+              <SortTH {...header('accelerations')} className="text-right">
+                상실
+              </SortTH>
+              <SortTH {...header('mismatches')} className="text-right">
+                대사 불일치
+              </SortTH>
             </TR>
           </THead>
           <TBody>
             {closings.data?.length === 0 && <EmptyRow colSpan={10} />}
-            {closings.data?.map((c) => (
+            {sorted.map((c) => (
               <TR key={c.businessDate}>
                 <TD>{formatDate(c.businessDate)}</TD>
                 <TD>{formatDateTime(c.closedAt)}</TD>
@@ -94,6 +123,13 @@ function Closing() {
 
 function AccessLogs() {
   const logs = useQuery({ queryKey: queryKeys.accessLogs, queryFn: endpoints.accessLogs })
+  const { sorted, header } = useSort(logs.data, {
+    accessedAt: (l) => l.accessedAt,
+    loginId: (l) => l.loginId,
+    ip: (l) => l.ip,
+    action: (l) => l.action,
+    reason: (l) => l.reason,
+  })
   return (
     <Card>
       <CardHeader>
@@ -104,17 +140,17 @@ function AccessLogs() {
         <Table>
           <THead>
             <TR>
-              <TH>시각</TH>
-              <TH>계정</TH>
-              <TH>IP</TH>
-              <TH>업무</TH>
+              <SortTH {...header('accessedAt')}>시각</SortTH>
+              <SortTH {...header('loginId')}>계정</SortTH>
+              <SortTH {...header('ip')}>IP</SortTH>
+              <SortTH {...header('action')}>업무</SortTH>
               <TH>대상</TH>
-              <TH>사유</TH>
+              <SortTH {...header('reason')}>사유</SortTH>
             </TR>
           </THead>
           <TBody>
             {logs.data?.length === 0 && <EmptyRow colSpan={6} />}
-            {logs.data?.map((l, i) => (
+            {sorted.map((l, i) => (
               <TR key={`${l.accessedAt}-${i}`}>
                 <TD>{formatDateTime(l.accessedAt)}</TD>
                 <TD>{l.loginId}</TD>
