@@ -17,7 +17,7 @@ export interface BusinessDateInfo {
   lastClosedAt: string | null
 }
 
-export type AccountStatus = 'NORMAL' | 'DELINQUENT' | 'ACCELERATED' | 'PAID_OFF'
+export type AccountStatus = 'NORMAL' | 'DELINQUENT' | 'ACCELERATED' | 'WORKOUT' | 'CHARGED_OFF' | 'SOLD' | 'PAID_OFF'
 
 export interface PageResponse<T> {
   content: T[]

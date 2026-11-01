@@ -83,6 +83,13 @@ const ledgerTypeLabels: Record<string, string> = {
   COST_CHARGE: '비용 적재',
   REFUND: '반환 대기',
   REVERSAL: '역분개',
+  WAIVER: '감면',
+  ADJUSTMENT: '조정',
+  CHARGE_OFF: '상각 (장부 제거)',
+  SALE: '매각',
+  REPURCHASE: '환매',
+  SALE_TRANSFER: '양수인 이전 대상',
+  SETOFF: '상계',
 }
 
 export function LedgerTab({ loanId }: { loanId: number }) {

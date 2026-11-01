@@ -18,7 +18,9 @@ import java.time.LocalDate;
 class AccountEvent extends BaseEntity {
 
 	enum Type {
-		PAYMENT, PREPAYMENT_REQUEST, DUE_DAY_CHANGE, COST_CHARGE, WORKOUT
+		PAYMENT, PREPAYMENT_REQUEST, DUE_DAY_CHANGE, COST_CHARGE, WORKOUT,
+		/** R39~R46 채권 생애주기 */
+		CHARGE_OFF, SALE, REPURCHASE, BUYER_TRANSFER, ADJUSTMENT, SETOFF_OUT, SETOFF_IN, INTEREST_SUSPENSION
 	}
 
 	private long accountId;
@@ -37,6 +39,12 @@ class AccountEvent extends BaseEntity {
 	private Integer installments;
 	/** 채무자 승인이 아닌 입금 (보증인·제3자·법원 배당 등): 소멸시효 중단으로 세지 않음 (R50). 재생에는 영향 없음 */
 	private boolean limitationExcluded;
+
+	private Long costDelta;
+	private Long preAcqDown;
+	private LocalDate endDate;
+	private String setoffSource;
+	private Long linkedEventId;
 
 	protected AccountEvent() {
 	}
@@ -82,6 +90,57 @@ class AccountEvent extends BaseEntity {
 		return e;
 	}
 
+	/** 상각 확정 (R39)·매각 (R40)·환매 (R41). 날짜만 있는 생애주기 이벤트 */
+	static AccountEvent lifecycle(long accountId, Type type, LocalDate on, String reason) {
+		return new AccountEvent(accountId, type, on, null, null, null, reason);
+	}
+
+	/** 양수인에게 이전 (R40) */
+	static AccountEvent buyerTransfer(long accountId, LocalDate on, Money amount, String reason) {
+		return new AccountEvent(accountId, Type.BUYER_TRANSFER, on, amount.won(), null, null, reason);
+	}
+
+	/** 수기 조정 (R42). 감액은 양수, costDelta는 증액이 양수 */
+	static AccountEvent adjustment(long accountId, LocalDate on, Money principalDown, Money normalDown,
+			Money lateDown, Money costDelta, Money preAcqDown, String reason) {
+		AccountEvent e = new AccountEvent(accountId, Type.ADJUSTMENT, on, null, null, null, reason);
+		e.waivePrincipal = principalDown.won();
+		e.waiveNormal = normalDown.won();
+		e.waiveLate = lateDown.won();
+		e.costDelta = costDelta.won();
+		e.preAcqDown = preAcqDown.won();
+		return e;
+	}
+
+	/** 상계 원천 (R44) */
+	static AccountEvent setoffOut(long accountId, LocalDate on, Money amount, LoanEvent.SetoffSource source,
+			String reason) {
+		AccountEvent e = new AccountEvent(accountId, Type.SETOFF_OUT, on, amount.won(), null, null, reason);
+		e.setoffSource = source.name();
+		return e;
+	}
+
+	/** 상계 대상 (R44) */
+	static AccountEvent setoffIn(long accountId, LocalDate on, Money amount, long linkedEventId, String reason) {
+		AccountEvent e = new AccountEvent(accountId, Type.SETOFF_IN, on, amount.won(), null, null, reason);
+		e.linkedEventId = linkedEventId;
+		return e;
+	}
+
+	/** 이자 부과 중단 [from, 계속) (R46) */
+	static AccountEvent interestSuspension(long accountId, LocalDate from, String reason) {
+		return new AccountEvent(accountId, Type.INTEREST_SUSPENSION, from, null, null, null, reason);
+	}
+
+	/** 이자 부과 중단을 끝냄 (end 당일부터 다시 이자). 시작일 이전이면 시작일로 (기간 0일) */
+	void endSuspension(LocalDate end) {
+		this.endDate = end.isBefore(eventDate) ? eventDate : end;
+	}
+
+	void link(long otherEventId) {
+		this.linkedEventId = otherEventId;
+	}
+
 	String ref() {
 		return "EV-" + getId();
 	}
@@ -95,6 +154,16 @@ class AccountEvent extends BaseEntity {
 			case COST_CHARGE -> new LoanEvent.CostCharge(ref(), eventDate, Money.won(amount));
 			case WORKOUT -> new LoanEvent.Workout(ref(), eventDate, Money.won(waiveLate), Money.won(waiveNormal),
 					Money.won(waivePrincipal), installments, newDueDay);
+			case CHARGE_OFF -> new LoanEvent.ChargeOff(ref(), eventDate);
+			case SALE -> new LoanEvent.Sale(ref(), eventDate);
+			case REPURCHASE -> new LoanEvent.Repurchase(ref(), eventDate);
+			case BUYER_TRANSFER -> new LoanEvent.BuyerTransfer(ref(), eventDate, Money.won(amount));
+			case ADJUSTMENT -> new LoanEvent.Adjustment(ref(), eventDate, Money.won(waivePrincipal),
+					Money.won(waiveNormal), Money.won(waiveLate), Money.won(costDelta), Money.won(preAcqDown));
+			case SETOFF_OUT -> new LoanEvent.SetoffOut(ref(), eventDate, Money.won(amount),
+					LoanEvent.SetoffSource.valueOf(setoffSource));
+			case SETOFF_IN -> new LoanEvent.SetoffIn(ref(), eventDate, Money.won(amount));
+			case INTEREST_SUSPENSION -> new LoanEvent.InterestSuspension(ref(), eventDate, endDate);
 		};
 	}
 
@@ -166,5 +235,25 @@ class AccountEvent extends BaseEntity {
 
 	Integer installments() {
 		return installments;
+	}
+
+	Long costDelta() {
+		return costDelta;
+	}
+
+	Long preAcqDown() {
+		return preAcqDown;
+	}
+
+	LocalDate endDate() {
+		return endDate;
+	}
+
+	String setoffSource() {
+		return setoffSource;
+	}
+
+	Long linkedEventId() {
+		return linkedEventId;
 	}
 }

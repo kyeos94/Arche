@@ -140,17 +140,19 @@ class AutoMessageService {
 	private final OutboundMessageRepository messages;
 	private final PaymentPromiseRepository promises;
 	private final ContactService contacts;
+	private final CollectionStopService stops;
 	private final LoanAccounts accounts;
 	private final MessagingPort messaging;
 	private final BusinessDates businessDates;
 	private final Clock clock;
 
 	AutoMessageService(OutboundMessageRepository messages, PaymentPromiseRepository promises,
-			ContactService contacts, LoanAccounts accounts, MessagingPort messaging, BusinessDates businessDates,
-			Clock clock) {
+			ContactService contacts, CollectionStopService stops, LoanAccounts accounts, MessagingPort messaging,
+			BusinessDates businessDates, Clock clock) {
 		this.messages = messages;
 		this.promises = promises;
 		this.contacts = contacts;
+		this.stops = stops;
 		this.accounts = accounts;
 		this.messaging = messaging;
 		this.businessDates = businessDates;
@@ -239,7 +241,11 @@ class AutoMessageService {
 				OutboundMessage.Status.SCHEDULED, today)) {
 			String reason = null;
 			int count = 0;
-			if (m.type().collection) {
+			// 매각 채권(R40)·추심 중지(R45)에는 완제 안내 말고는 아무것도 보내지 않는다 (납입·약속 안내 포함)
+			if (m.type() != OutboundMessage.Type.PAYOFF) {
+				reason = stops.blockReason(m.accountId());
+			}
+			if (reason == null && m.type().collection) {
 				LoanAccounts.MessagingView v = accounts.messagingView(m.accountId());
 				if (v.delinquencyStartedOn() == null) {
 					reason = "연체가 해소되어 보내지 않음";

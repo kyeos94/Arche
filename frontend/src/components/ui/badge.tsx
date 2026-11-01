@@ -20,6 +20,10 @@ const tones: Record<string, string> = {
   REPLACED: 'bg-slate-100 text-slate-600 border-slate-200',
   PAID_OFF: 'bg-sky-50 text-sky-700 border-sky-200',
   SPLIT: 'bg-sky-50 text-sky-700 border-sky-200',
+  CHARGED_OFF: 'bg-slate-100 text-slate-600 border-slate-200',
+  SOLD: 'bg-red-50 text-red-700 border-red-200',
+  CONSUMED: 'bg-slate-100 text-slate-600 border-slate-200',
+  RELEASED: 'bg-slate-100 text-slate-600 border-slate-200',
 }
 
 export function Badge({ className, ...props }: React.ComponentProps<'span'>) {

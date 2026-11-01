@@ -15,11 +15,13 @@ import { Can } from '@/features/auth/auth'
 import { formatDate, formatDateTime, formatMoney, statusLabel } from '@/lib/format'
 import { promiseSchema } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
+import { CollectionStopCard } from '@/features/lifecycle/CollectionStopCard'
 
 /** 추심 탭: 소멸시효(G13), 연락 유예, 연락 기록(G14), 자동 문자, 분할납부 약속(G19, 매입채권만) */
 export function CollectionTab({ loan }: { loan: LoanDetail }) {
   return (
     <div className="space-y-3">
+      <CollectionStopCard loanId={loan.id} businessDate={loan.businessDate} />
       <LimitationCard loanId={loan.id} businessDate={loan.businessDate} />
       <DeferralCard loanId={loan.id} businessDate={loan.businessDate} />
       <ContactsCard loanId={loan.id} />

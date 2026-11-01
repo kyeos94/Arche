@@ -112,6 +112,13 @@ export const statusLabels: Record<string, string> = {
   CASH: '현금',
   AUCTION_DISTRIBUTION: '경매 배당금',
   COURT_DEPOSIT: '공탁금 출급',
+  REPURCHASED: '환매',
+  RELEASED: '해제',
+  CONSUMED: '사용됨',
+  INTEREST_SUSPENSION: '이자 부과 중단',
+  BUYER_TRANSFER: '양수인 이전',
+  SETOFF_IN: '상계 (받음)',
+  SETOFF_OUT: '상계 (보냄)',
 }
 
 /** 법조치 종류·단계·비용 (R51·R52). 계약 상태 SOLD(매각)와 겹쳐 따로 둔다 */

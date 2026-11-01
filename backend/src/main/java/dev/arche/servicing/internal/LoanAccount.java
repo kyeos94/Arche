@@ -64,6 +64,9 @@ class LoanAccount extends BaseEntity {
 	private Long assignedStaffId;
 	private String virtualAccountNo;
 	private int scheduleVersion;
+	private LocalDate chargedOffOn;
+	private LocalDate soldOn;
+	private long transferPending;
 
 	protected LoanAccount() {
 	}
@@ -118,6 +121,9 @@ class LoanAccount extends BaseEntity {
 		nextDueDate = r.nextInstallment().map(i -> i.dueDate()).orElse(null);
 		asOf = r.asOf();
 		scheduleVersion = r.scheduleVersion();
+		chargedOffOn = r.chargedOffOn();
+		soldOn = r.soldOn();
+		transferPending = r.transferPending().won();
 	}
 
 	String accountNo() {
@@ -266,5 +272,20 @@ class LoanAccount extends BaseEntity {
 
 	int scheduleVersion() {
 		return scheduleVersion;
+	}
+
+	/** 상각 확정일 (R39) */
+	LocalDate chargedOffOn() {
+		return chargedOffOn;
+	}
+
+	/** 매각 중이면 매각일 (R40) */
+	LocalDate soldOn() {
+		return soldOn;
+	}
+
+	/** 양수인 이전 대상 잔액 (R40) */
+	long transferPending() {
+		return transferPending;
 	}
 }

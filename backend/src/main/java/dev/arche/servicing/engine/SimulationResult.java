@@ -13,6 +13,9 @@ import org.jspecify.annotations.Nullable;
  * @param unpaidNormalInterest  정산 이벤트에서 확정됐으나 미납인 정상이자
  * @param accruedNormalInterest 마지막 정산일부터 기준일까지 발생한 미확정 정상이자 (조회용, R1)
  * @param payoffAmount          기준일 완제 금액 (R8)
+ * @param chargedOffOn          상각 확정일 (R39)
+ * @param soldOn                매각 중이면 매각일 (R40, 환매하면 null)
+ * @param transferPending       양수인에게 아직 넘기지 않은 매각 후 입금 (R40)
  */
 public record SimulationResult(
 		LocalDate asOf,
@@ -41,7 +44,10 @@ public record SimulationResult(
 		Money payoffAmount,
 		@Nullable LocalDate paidOffOn,
 		List<String> warnings,
-		List<WorkoutView> workouts) {
+		List<WorkoutView> workouts,
+		@Nullable LocalDate chargedOffOn,
+		@Nullable LocalDate soldOn,
+		Money transferPending) {
 
 	/** 연체일수 = 기준일 − 가장 오래된 미납 회차의 약정일 */
 	public long delinquencyDays() {

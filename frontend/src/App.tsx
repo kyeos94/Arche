@@ -9,6 +9,7 @@ import { BulkPage } from '@/features/bulk/BulkPage'
 import { LoanDetailPage } from '@/features/loans/LoanDetailPage'
 import { LoanListPage } from '@/features/loans/LoanListPage'
 import { NewLoanPage } from '@/features/loans/NewLoanPage'
+import { AdjustmentsPage, ChargeOffCandidatesPage } from '@/features/lifecycle/pages'
 import { CorrectionsPage } from '@/features/payments/CorrectionsPage'
 import { SplitPage } from '@/features/payments/SplitPage'
 import { LegalActionsPage } from '@/features/collection/LegalActionsPage'
@@ -37,6 +38,8 @@ export function App() {
         <Route path="corrections" element={<CorrectionsPage />} />
         <Route path="payment-splits" element={<SplitPage />} />
         <Route path="legal-actions" element={<LegalActionsPage />} />
+        <Route path="charge-off" element={<ChargeOffCandidatesPage />} />
+        <Route path="adjustments" element={<AdjustmentsPage />} />
         <Route path="bulk" element={<BulkPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="admin" element={<AdminPage />} />

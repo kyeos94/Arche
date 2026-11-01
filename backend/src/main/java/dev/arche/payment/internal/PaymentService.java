@@ -380,10 +380,7 @@ class PaymentService implements Payments {
 			return;
 		}
 		long sourceAccount = p.accountId();
-		AccountRef before = accounts.get(sourceAccount);
-		if (before.paidOffOn() != null) {
-			throw new BusinessException("CANCEL_AFTER_PAYOFF", "완제된 계약의 입금은 취소할 수 없습니다 (R31)");
-		}
+		// R31(완제·매각·상각 후 취소 제한)과 R43(완제 취소 승인)은 servicing이 계약 락 안에서 판정한다
 		accounts.cancelPayment(sourceAccount, p.getId(), c.reason(), c.getId());
 		cancelClaim(p, c.reason());
 		Long newPaymentId = null;

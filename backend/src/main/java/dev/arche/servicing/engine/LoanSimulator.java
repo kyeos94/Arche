@@ -122,6 +122,30 @@ public final class LoanSimulator {
 		static final Settled NONE = new Settled(Money.ZERO, Money.ZERO);
 	}
 
+	/** 매각 기간에 들어온 돈 (환매 시 충당) */
+	private record Received(String ref, Money amount) {
+	}
+
+	/** 매각 때 양수인에게 넘긴 잔액 (R40·R41) */
+	private static final class SoldState {
+		final LocalDate soldOn;
+		final Money principal;
+		final Money normal;
+		final Money late;
+		final Money cost;
+		final Money preAcq;
+		final List<Received> received = new ArrayList<>();
+
+		SoldState(LocalDate soldOn, Money principal, Money normal, Money late, Money cost, Money preAcq) {
+			this.soldOn = soldOn;
+			this.principal = principal;
+			this.normal = normal;
+			this.late = late;
+			this.cost = cost;
+			this.preAcq = preAcq;
+		}
+	}
+
 	private final class Run {
 
 		private final LoanTerms terms;
@@ -169,6 +193,20 @@ public final class LoanSimulator {
 		/** 체결된 채무조정 (3회차 연속 미납 시 감면액 부활 대상) */
 		private @Nullable WorkoutState activeWorkout;
 
+		// 채권 생애주기 (R39~R46)
+		private final List<LoanEvent.ChargeOff> chargeOffs = new ArrayList<>();
+		private final List<LoanEvent.Sale> sales = new ArrayList<>();
+		private final List<LoanEvent.Repurchase> repurchases = new ArrayList<>();
+		private final List<LoanEvent.BuyerTransfer> buyerTransfers = new ArrayList<>();
+		private final List<LoanEvent.Adjustment> adjustments = new ArrayList<>();
+		private final List<LoanEvent.SetoffOut> setoffOuts = new ArrayList<>();
+		private final List<LoanEvent.SetoffIn> setoffIns = new ArrayList<>();
+		private final List<LoanEvent.InterestSuspension> suspensions = new ArrayList<>();
+		private @Nullable LocalDate chargedOffOn;
+		/** 매각 중이면 매각 때 넘긴 잔액 (환매 시 되살림) */
+		private @Nullable SoldState sold;
+		private Money transferPending = Money.ZERO;
+
 		Run(LoanTerms terms, List<LoanEvent> events, Options options) {
 			this.terms = terms;
 			this.method = terms.method();
@@ -184,6 +222,14 @@ public final class LoanSimulator {
 					case LoanEvent.DueDayChange c -> dueDayChanges.add(c);
 					case LoanEvent.CostCharge c -> costs.add(c);
 					case LoanEvent.Workout w -> workoutEvents.add(w);
+					case LoanEvent.ChargeOff c -> chargeOffs.add(c);
+					case LoanEvent.Sale s -> sales.add(s);
+					case LoanEvent.Repurchase r -> repurchases.add(r);
+					case LoanEvent.BuyerTransfer t -> buyerTransfers.add(t);
+					case LoanEvent.Adjustment a -> adjustments.add(a);
+					case LoanEvent.SetoffOut s -> setoffOuts.add(s);
+					case LoanEvent.SetoffIn s -> setoffIns.add(s);
+					case LoanEvent.InterestSuspension s -> suspensions.add(s);
 				}
 			}
 			for (RatePeriod p : terms.ratePeriods()) {
@@ -313,6 +359,23 @@ public final class LoanSimulator {
 					post(d, PostingType.COST_CHARGE, c.ref(), c.amount()).add();
 				}
 			}
+			// 환매·상각·매각은 그날 입금보다 먼저 (R39~R41): 상각일 입금은 상각 후 회수, 매각일(포함) 이후 입금은 이전 대상,
+			// 환매일 입금은 되살린 잔액에 충당. 같은 날 상각 후 매각도 이 순서
+			for (LoanEvent.Repurchase r : repurchases) {
+				if (r.on().equals(d)) {
+					repurchase(d, r);
+				}
+			}
+			for (LoanEvent.ChargeOff c : chargeOffs) {
+				if (c.on().equals(d)) {
+					chargeOff(d, c);
+				}
+			}
+			for (LoanEvent.Sale s : sales) {
+				if (s.on().equals(d)) {
+					sell(d, s);
+				}
+			}
 			for (LoanEvent.Workout w : workoutEvents) {
 				if (w.contractedOn().equals(d)) {
 					beginWorkout(d, w);
@@ -321,7 +384,12 @@ public final class LoanSimulator {
 			for (LoanEvent.Payment p : payments) {
 				if (!processedPayments.contains(p.ref()) && valueDate(p.bankDate()).equals(d)) {
 					processedPayments.add(p.ref());
-					receive(d, p);
+					receive(d, p.ref(), p.amount(), PostingType.REPAYMENT, PostingType.SUSPENSE_IN, true);
+				}
+			}
+			for (LoanEvent.SetoffIn s : setoffIns) {
+				if (s.on().equals(d)) {
+					receive(d, s.ref(), s.amount(), PostingType.SETOFF, PostingType.SETOFF, false);
 				}
 			}
 			if (pendingWorkout != null) {
@@ -338,6 +406,22 @@ public final class LoanSimulator {
 			for (LoanEvent.DueDayChange c : dueDayChanges) {
 				if (c.requestedOn().equals(d)) {
 					changeDueDay(c);
+				}
+			}
+			// 하루 끝: 수기 조정·상계 원천·양수인 이전 (그날 입금을 반영한 잔액 기준)
+			for (LoanEvent.Adjustment a : adjustments) {
+				if (a.on().equals(d)) {
+					adjust(d, a);
+				}
+			}
+			for (LoanEvent.SetoffOut s : setoffOuts) {
+				if (s.on().equals(d)) {
+					setoffOut(d, s);
+				}
+			}
+			for (LoanEvent.BuyerTransfer t : buyerTransfers) {
+				if (t.on().equals(d)) {
+					transferToBuyer(d, t);
 				}
 			}
 		}
@@ -449,12 +533,28 @@ public final class LoanSimulator {
 
 		// ---------------------------------------------------------------- 이자
 
+		/** 상각일 이후(R39)와 이자 부과 중단 기간(R46)에는 정상이자·가산이자를 붙이지 않는다 */
+		private boolean interestStopped(LocalDate day) {
+			if (chargedOffOn != null && !day.isBefore(chargedOffOn)) {
+				return true;
+			}
+			for (LoanEvent.InterestSuspension s : suspensions) {
+				if (!day.isBefore(s.from()) && (s.until() == null || day.isBefore(s.until()))) {
+					return true;
+				}
+			}
+			return false;
+		}
+
 		private InterestAccrual.Basis normalBasis(LocalDate day) {
+			if (interestStopped(day)) {
+				return new InterestAccrual.Basis(Money.ZERO, InterestRate.ZERO);
+			}
 			return new InterestAccrual.Basis(principal, terms.rateAt(day));
 		}
 
 		private InterestAccrual.Basis lateBasis(LocalDate day) {
-			if (method == RepaymentMethod.ACQUIRED) {
+			if (method == RepaymentMethod.ACQUIRED || interestStopped(day)) {
 				return new InterestAccrual.Basis(Money.ZERO, InterestRate.ZERO);
 			}
 			InterestRate spread = terms.rateAt(day).lateSpread();
@@ -499,25 +599,36 @@ public final class LoanSimulator {
 
 		// ---------------------------------------------------------------- 입금·충당
 
-		private void receive(LocalDate d, LoanEvent.Payment p) {
-			totalPaid = totalPaid.plus(p.amount());
+		/**
+		 * 돈이 들어옴 (입금 또는 상계 R44). immediate = 즉시 충당 거래 유형, held = 가수금 보관 거래 유형.
+		 * 매각 중이면 충당하지 않고 양수인 이전 대상으로 남긴다 (R40).
+		 */
+		private void receive(LocalDate d, String ref, Money amount, PostingType immediate, PostingType held,
+				boolean bankPayment) {
+			if (sold != null) {
+				transferPending = transferPending.plus(amount);
+				sold.received.add(new Received(ref, amount));
+				post(d, PostingType.SALE_TRANSFER, ref, amount).add();
+				return;
+			}
+			totalPaid = totalPaid.plus(amount);
 			if (paidOffOn != null) {
-				refundPending = refundPending.plus(p.amount());
-				post(d, PostingType.REFUND, p.ref(), p.amount()).refund(p.amount()).add();
+				refundPending = refundPending.plus(amount);
+				post(d, PostingType.REFUND, ref, amount).refund(amount).add();
 				return;
 			}
 			if (pendingWorkout != null) {
 				// 채무조정 체결일 입금은 미감면 이자·비용에만 충당하고, 남는 돈은 가수금 (R36)
-				allocate(d, p.amount(), false, PostingType.REPAYMENT, p.ref(), false, true);
+				allocate(d, amount, false, immediate, ref, false, true);
 				return;
 			}
 			boolean dueAll = method.settlesOnPayment() || accelerated || matured(d);
 			if (dueAll || delinquent()) {
-				allocate(d, p.amount(), dueAll, PostingType.REPAYMENT, p.ref(), false);
+				allocate(d, amount, dueAll, immediate, ref, false);
 			} else {
 				// 연체 없는 계약의 약정일 전 입금은 가수금 (정책서 4장, R32)
-				suspense = suspense.plus(p.amount());
-				post(d, PostingType.SUSPENSE_IN, p.ref(), p.amount()).suspense(p.amount()).add();
+				suspense = suspense.plus(amount);
+				post(d, held, ref, amount).suspense(amount).add();
 			}
 		}
 
@@ -585,7 +696,7 @@ public final class LoanSimulator {
 		}
 
 		private void checkPaidOff(LocalDate d) {
-			if (paidOffOn == null && principal.isZero() && unpaidNormal.isZero() && unpaidLate.isZero()
+			if (paidOffOn == null && sold == null && principal.isZero() && unpaidNormal.isZero() && unpaidLate.isZero()
 					&& cost.isZero() && preAcq.isZero()) {
 				paidOffOn = d;
 				active = null;
@@ -699,8 +810,9 @@ public final class LoanSimulator {
 		private void beginWorkout(LocalDate d, LoanEvent.Workout w) {
 			WorkoutState ws = new WorkoutState(w);
 			workouts.add(ws);
-			if (paidOffOn != null || method == RepaymentMethod.ACQUIRED || pendingWorkout != null) {
-				warnings.add(w.ref() + ": 채무조정을 체결할 수 없는 상태 (완제·매입채권)");
+			if (paidOffOn != null || method == RepaymentMethod.ACQUIRED || pendingWorkout != null || sold != null
+					|| chargedOffOn != null) {
+				warnings.add(w.ref() + ": 채무조정을 체결할 수 없는 상태 (완제·매입채권·상각·매각)");
 				return;
 			}
 			Settled s = settle(d);
@@ -784,6 +896,151 @@ public final class LoanSimulator {
 				}
 			}
 			return false;
+		}
+
+		// ---------------------------------------------------------------- 상각·매각·환매 (R39~R41)
+
+		private Money claimTotal() {
+			return principal.plus(unpaidNormal).plus(unpaidLate).plus(cost).plus(preAcq);
+		}
+
+		/** 상각 확정: 확정일까지 이자 정산 → 장부 제거액 기록. 원금 잔액(청구 잔액)은 그대로, 확정일부터 이자 중단 (R39) */
+		private void chargeOff(LocalDate d, LoanEvent.ChargeOff c) {
+			if (paidOffOn != null || sold != null || chargedOffOn != null || !accelerated) {
+				warnings.add(c.ref() + ": 상각할 수 없는 상태 (기한이익상실 채권만, 완제·매각·이미 상각 제외)");
+				return;
+			}
+			Settled s = settle(d);
+			chargedOffOn = d;
+			post(d, PostingType.CHARGE_OFF, c.ref(), claimTotal()).principal(principal).normal(unpaidNormal)
+					.late(unpaidLate).cost(cost).preAcq(preAcq).accrued(s.normal(), s.late()).add();
+		}
+
+		/** 매각: 매각일까지 이자 정산 → 잔액을 양수인에게 넘김. 남은 가수금도 이전 대상 (R40) */
+		private void sell(LocalDate d, LoanEvent.Sale e) {
+			if (paidOffOn != null || sold != null || !accelerated) {
+				warnings.add(e.ref() + ": 매각할 수 없는 상태 (상각·기한이익상실 채권만)");
+				return;
+			}
+			Settled s = settle(d);
+			SoldState st = new SoldState(e.on(), principal, unpaidNormal, unpaidLate, cost, preAcq);
+			Money total = claimTotal();
+			principal = Money.ZERO;
+			unpaidNormal = Money.ZERO;
+			unpaidLate = Money.ZERO;
+			cost = Money.ZERO;
+			preAcq = Money.ZERO;
+			post(d, PostingType.SALE, e.ref(), total).principal(st.principal).normal(st.normal).late(st.late)
+					.cost(st.cost).preAcq(st.preAcq).accrued(s.normal(), s.late()).add();
+			sold = st;
+			if (suspense.isPositive()) {
+				Money held = suspense;
+				suspense = Money.ZERO;
+				transferPending = transferPending.plus(held);
+				st.received.add(new Received(e.ref() + "-SUSPENSE", held));
+				post(d, PostingType.SALE_TRANSFER, e.ref() + "-SUSPENSE", held).suspense(Money.ZERO.minus(held)).add();
+			}
+		}
+
+		/**
+		 * 환매: 넘긴 잔액을 되살린다(매각 기간 이자 없음). 매각 기간 입금은 환매일에 채무자 입금으로 충당하고 이전 대상에서
+		 * 뺀다. 이미 양수인에게 넘긴 금액은 양수인과 환매가로 정산한다(시스템 밖) (R41)
+		 */
+		private void repurchase(LocalDate d, LoanEvent.Repurchase r) {
+			SoldState st = sold;
+			if (st == null) {
+				warnings.add(r.ref() + ": 매각 중인 채권이 아님");
+				return;
+			}
+			sold = null;
+			lastSettled = d.isAfter(lastSettled) ? d : lastSettled;
+			principal = st.principal;
+			unpaidNormal = st.normal;
+			unpaidLate = st.late;
+			cost = st.cost;
+			preAcq = st.preAcq;
+			Money total = claimTotal();
+			post(d, PostingType.REPURCHASE, r.ref(), Money.ZERO.minus(total))
+					.principal(Money.ZERO.minus(st.principal)).normal(Money.ZERO.minus(st.normal))
+					.late(Money.ZERO.minus(st.late)).cost(Money.ZERO.minus(st.cost))
+					.preAcq(Money.ZERO.minus(st.preAcq)).add();
+			if (transferPending.isPositive()) {
+				Money release = transferPending;
+				transferPending = Money.ZERO;
+				post(d, PostingType.SALE_TRANSFER, r.ref() + "-RELEASE", Money.ZERO.minus(release)).add();
+			}
+			for (Received x : st.received) {
+				totalPaid = totalPaid.plus(x.amount());
+				if (paidOffOn != null) {
+					refundPending = refundPending.plus(x.amount());
+					post(d, PostingType.REFUND, x.ref() + "-BUYBACK", x.amount()).refund(x.amount()).add();
+				} else {
+					allocate(d, x.amount(), true, PostingType.REPAYMENT, x.ref() + "-BUYBACK", false);
+				}
+			}
+		}
+
+		private void transferToBuyer(LocalDate d, LoanEvent.BuyerTransfer t) {
+			if (t.amount().isGreaterThan(transferPending)) {
+				warnings.add(t.ref() + ": 이전 대상 금액(" + transferPending + ")보다 많이 이전함");
+			}
+			transferPending = transferPending.minus(t.amount());
+			post(d, PostingType.SALE_TRANSFER, t.ref(), Money.ZERO.minus(t.amount())).add();
+		}
+
+		// ---------------------------------------------------------------- 수기 조정·상계 (R42·R44)
+
+		/** 그날까지 이자 정산 → 항목별 감액(미납액까지), 비용 증감. 원금 감액은 마지막 회차부터 (R42) */
+		private void adjust(LocalDate d, LoanEvent.Adjustment a) {
+			if (paidOffOn != null || sold != null) {
+				warnings.add(a.ref() + ": 조정할 수 없는 상태 (완제·매각)");
+				return;
+			}
+			Settled s = settle(d);
+			Money late = a.lateDown().max(Money.ZERO).min(unpaidLate);
+			Money normal = a.normalDown().max(Money.ZERO).min(unpaidNormal);
+			Money pre = a.preAcqDown().max(Money.ZERO).min(preAcq);
+			Money princ = a.principalDown().max(Money.ZERO).min(principal);
+			Money costField = a.costDelta().isNegative() ? Money.ZERO.minus(a.costDelta()).min(cost)
+					: Money.ZERO.minus(a.costDelta());
+			unpaidLate = unpaidLate.minus(late);
+			unpaidNormal = unpaidNormal.minus(normal);
+			preAcq = preAcq.minus(pre);
+			cost = cost.minus(costField);
+			List<Posting.InstallmentAllocation> allocations = new ArrayList<>();
+			Money left = princ;
+			for (int k = schedule.size() - 1; k >= 0 && left.isPositive(); k--) {
+				Inst i = schedule.get(k);
+				if (i.unpaid().isPositive()) {
+					Money t = left.min(i.unpaid());
+					i.principalPaid = i.principalPaid.plus(t);
+					allocations.add(new Posting.InstallmentAllocation(i.seq, t));
+					left = left.minus(t);
+				}
+			}
+			principal = principal.minus(princ);
+			post(d, PostingType.ADJUSTMENT, a.ref(), princ.plus(normal).plus(late).plus(pre).plus(costField))
+					.principal(princ).normal(normal).late(late).preAcq(pre).cost(costField)
+					.accrued(s.normal(), s.late()).allocations(allocations).add();
+			updateResolution();
+			checkPaidOff(d);
+		}
+
+		/** 상계 원천: 반환 대기 또는 가수금에서 뺀다. 모자라면 경고 (저장 계층이 거절) (R44) */
+		private void setoffOut(LocalDate d, LoanEvent.SetoffOut s) {
+			if (s.source() == LoanEvent.SetoffSource.REFUND) {
+				refundPending = refundPending.minus(s.amount());
+				post(d, PostingType.SETOFF, s.ref(), s.amount()).refund(Money.ZERO.minus(s.amount())).add();
+				if (refundPending.isNegative()) {
+					warnings.add(s.ref() + ": 상계액이 반환 대기 금액보다 큼");
+				}
+			} else {
+				suspense = suspense.minus(s.amount());
+				post(d, PostingType.SETOFF, s.ref(), s.amount()).suspense(Money.ZERO.minus(s.amount())).add();
+				if (suspense.isNegative()) {
+					warnings.add(s.ref() + ": 상계액이 가수금보다 큼");
+				}
+			}
 		}
 
 		// ---------------------------------------------------------------- 조건 변경 (R20·R21)
@@ -967,6 +1224,8 @@ public final class LoanSimulator {
 					: cost.plus(unpaidLate).plus(acc.late()).plus(unpaidNormal).plus(acc.normal()).plus(preAcq)
 							.plus(principal).plus(feeToday).minus(suspense).max(Money.ZERO);
 			AccountStatus status = paidOffOn != null ? AccountStatus.PAID_OFF
+					: sold != null ? AccountStatus.SOLD
+					: chargedOffOn != null ? AccountStatus.CHARGED_OFF
 					: accelerated ? AccountStatus.ACCELERATED
 							: activeWorkout != null ? AccountStatus.WORKOUT
 									: since != null ? AccountStatus.DELINQUENT : AccountStatus.NORMAL;
@@ -975,7 +1234,8 @@ public final class LoanSimulator {
 					schedule.stream().map(i -> view(i, null)).toList(), List.copyOf(previousVersions),
 					List.copyOf(postings), notices.stream().map(Notice::view).toList(), totalPaid, refundPending,
 					feeToday, payoff, paidOffOn, List.copyOf(warnings),
-					workouts.stream().map(WorkoutState::view).toList());
+					workouts.stream().map(WorkoutState::view).toList(), chargedOffOn,
+					sold == null ? null : sold.soldOn, transferPending);
 		}
 	}
 }

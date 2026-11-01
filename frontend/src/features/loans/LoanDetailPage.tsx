@@ -12,6 +12,7 @@ import { PaymentsTab } from '@/features/payments/PaymentsTab'
 import { formatDate, formatMoney, formatRate } from '@/lib/format'
 import { CollateralTab } from '@/features/collateral/CollateralTab'
 import { TimelinePanel } from '@/features/communication/TimelinePanel'
+import { LifecycleTab } from '@/features/lifecycle/LifecycleTab'
 import { CollectionTab } from './CollectionTab'
 import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
@@ -84,6 +85,8 @@ export function LoanDetailPage() {
   if (!q.data) return <p className="text-xs text-muted-foreground">불러오는 중…</p>
   const loan = q.data
   const open = loan.status !== 'PAID_OFF'
+  // 상각·매각 채권은 조건 변경·채무조정 대상이 아님 (R39·R40). 매각 후 입금은 양수인 이전 대상으로 받는다
+  const changeable = open && loan.status !== 'SOLD' && loan.status !== 'CHARGED_OFF'
 
   return (
     <div className="space-y-3">
@@ -94,7 +97,7 @@ export function LoanDetailPage() {
         <div className="flex gap-1">
           <Can permission="payment.register">{open && <PaymentDialog loan={loan} />}</Can>
           <Can permission="loan.term.change">
-            {open && loan.repaymentMethod !== 'ACQUIRED' && (
+            {changeable && loan.repaymentMethod !== 'ACQUIRED' && (
               <>
                 <RateChangeDialog loan={loan} />
                 <DueDayChangeDialog loan={loan} />
@@ -102,7 +105,7 @@ export function LoanDetailPage() {
             )}
           </Can>
           <Can permission="workout.waive.late">
-            {open && loan.repaymentMethod !== 'ACQUIRED' && <WorkoutDialog loan={loan} />}
+            {changeable && loan.repaymentMethod !== 'ACQUIRED' && <WorkoutDialog loan={loan} />}
           </Can>
           <Can permission="customer.id.reveal">
             <RevealDialog loan={loan} />
@@ -123,6 +126,7 @@ export function LoanDetailPage() {
               <TabsTrigger value="collection">추심</TabsTrigger>
               <TabsTrigger value="legal">법조치</TabsTrigger>
               <TabsTrigger value="collateral">담보·보증인</TabsTrigger>
+              <TabsTrigger value="lifecycle">생애주기</TabsTrigger>
             </TabsList>
             {/* 탭은 선택될 때만 마운트 → 지연 로딩 */}
             <TabsContent value="schedule">{tab === 'schedule' && <ScheduleTab loanId={id} />}</TabsContent>
@@ -132,6 +136,7 @@ export function LoanDetailPage() {
             <TabsContent value="collection">{tab === 'collection' && <CollectionTab loan={loan} />}</TabsContent>
             <TabsContent value="legal">{tab === 'legal' && <LegalTab loan={loan} />}</TabsContent>
             <TabsContent value="collateral">{tab === 'collateral' && <CollateralTab loan={loan} />}</TabsContent>
+            <TabsContent value="lifecycle">{tab === 'lifecycle' && <LifecycleTab loan={loan} />}</TabsContent>
           </Tabs>
         </div>
         <TimelinePanel loanId={id} />

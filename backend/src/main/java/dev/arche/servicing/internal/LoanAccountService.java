@@ -43,6 +43,7 @@ class LoanAccountService implements LoanAccounts {
 	private final AcquisitionRepository acquisitions;
 	private final LedgerEntryRepository ledger;
 	private final AccountReplayer replayer;
+	private final AdjustmentRequestRepository adjustmentRequests;
 	private final LimitationService limitationService;
 	private final ProductCatalog products;
 	private final BusinessDates businessDates;
@@ -53,7 +54,7 @@ class LoanAccountService implements LoanAccounts {
 	LoanAccountService(LoanAccountRepository accounts, RateTermRepository rateTerms,
 			DueDayTermRepository dueDayTerms, AccountEventRepository events, InstallmentRepository installments,
 			AcquisitionRepository acquisitions, LedgerEntryRepository ledger, AccountReplayer replayer,
-			LimitationService limitationService,
+			AdjustmentRequestRepository adjustmentRequests, LimitationService limitationService,
 			ProductCatalog products, BusinessDates businessDates, NumberGenerator numbers, Clock clock,
 			PlatformTransactionManager tx) {
 		this.accounts = accounts;
@@ -64,6 +65,7 @@ class LoanAccountService implements LoanAccounts {
 		this.acquisitions = acquisitions;
 		this.ledger = ledger;
 		this.replayer = replayer;
+		this.adjustmentRequests = adjustmentRequests;
 		this.limitationService = limitationService;
 		this.products = products;
 		this.businessDates = businessDates;
@@ -191,18 +193,39 @@ class LoanAccountService implements LoanAccounts {
 	@Transactional
 	public AccountRef cancelPayment(long accountId, long paymentId, String reason, @Nullable Long correctionId) {
 		LoanAccount a = lock(accountId);
-		if (a.status() == AccountStatus.PAID_OFF) {
-			throw new BusinessException("CANCEL_AFTER_PAYOFF", "완제된 계약의 입금은 취소할 수 없습니다 (R31)");
-		}
 		List<AccountEvent> active = events.findByPaymentIdAndStatus(paymentId, "ACTIVE");
 		if (active.isEmpty()) {
 			throw new BusinessException("PAYMENT_NOT_APPLIED", "이 계약에 충당된 입금이 아닙니다");
+		}
+		LocalDate bankDate = active.stream().filter(e -> e.type() == AccountEvent.Type.PAYMENT)
+				.map(AccountEvent::eventDate).findFirst().orElse(active.getFirst().eventDate());
+		// R31: 완제·매각·상각 확정 전 입금은 취소 불가. 완제 취소(R43) 승인이 있으면 1건 허용하고 소진
+		AdjustmentRequest unlock = null;
+		if (restrictedByR31(a, bankDate)) {
+			unlock = adjustmentRequests.findFirstByAccountIdAndTypeAndStatusOrderById(accountId,
+					AdjustmentRequest.Type.REVERT_PAYOFF, AdjustmentRequest.Status.APPLIED)
+					.orElseThrow(() -> new BusinessException("CANCEL_AFTER_PAYOFF",
+							"완제·매각·상각 확정 전 입금은 취소할 수 없습니다. 완제 취소(R43) 승인을 먼저 받으세요 (R31)"));
 		}
 		LocalDate today = businessDates.today();
 		active.forEach(e -> e.cancel(today, reason));
 		events.flush();
 		replay(a, correctionId);
+		LifecycleService.requireNonNegative(a);
+		if (unlock != null) {
+			unlock.consumed(today);
+		}
 		return ref(a);
+	}
+
+	/** R31 제한 대상: 완제 계약의 입금, 매각·상각 계약의 매각일·상각일 전 입금 */
+	static boolean restrictedByR31(LoanAccount a, LocalDate bankDate) {
+		return switch (a.status()) {
+			case PAID_OFF -> true;
+			case SOLD -> a.soldOn() != null && bankDate.isBefore(a.soldOn());
+			case CHARGED_OFF -> a.chargedOffOn() != null && bankDate.isBefore(a.chargedOffOn());
+			default -> false;
+		};
 	}
 
 	// ------------------------------------------------------------------ 조건 변경 (R20·R21)
@@ -351,6 +374,63 @@ class LoanAccountService implements LoanAccounts {
 		if (a.status() == AccountStatus.PAID_OFF) {
 			throw new BusinessException("ACCOUNT_CLOSED", "완제된 계약입니다");
 		}
+		if (a.status() == AccountStatus.SOLD) {
+			throw new BusinessException("ACCOUNT_SOLD", "매각된 채권은 조건을 바꾸거나 비용을 적재할 수 없습니다 (R40)");
+		}
+		if (a.status() == AccountStatus.CHARGED_OFF) {
+			throw new BusinessException("ACCOUNT_CHARGED_OFF", "상각 채권입니다. 상각 취소(R43) 후 진행하세요 (R39)");
+		}
+	}
+
+	// ------------------------------------------------------------------ 추심 중지와 이자·금리 (R45·R46)
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<AccountRef> sameCustomerOpenAccounts(long accountId) {
+		LoanAccount a = find(accountId);
+		return accounts.findByCustomerIdOrderById(a.customerId()).stream()
+				.filter(x -> x.status() != AccountStatus.PAID_OFF && x.status() != AccountStatus.SOLD)
+				.map(LoanAccountService::ref).toList();
+	}
+
+	@Override
+	@Transactional
+	public long suspendInterest(long accountId, LocalDate from, String reason) {
+		LoanAccount a = lock(accountId);
+		if (a.status() == AccountStatus.PAID_OFF || a.status() == AccountStatus.SOLD) {
+			throw new BusinessException("ACCOUNT_CLOSED", "완제·매각된 계약입니다");
+		}
+		LocalDate start = from.isBefore(a.disbursedOn()) ? a.disbursedOn() : from;
+		AccountEvent e = events.saveAndFlush(AccountEvent.interestSuspension(accountId, start, reason));
+		replay(a, null);
+		return e.getId();
+	}
+
+	@Override
+	@Transactional
+	public void endInterestSuspension(long accountId, long eventId, LocalDate on) {
+		LoanAccount a = lock(accountId);
+		AccountEvent e = events.findById(eventId).filter(x -> x.accountId() == accountId
+				&& x.type() == AccountEvent.Type.INTEREST_SUSPENSION && x.active())
+				.orElseThrow(() -> new BusinessException("EVENT_NOT_FOUND", "이자 부과 중단 기록이 없습니다"));
+		e.endSuspension(on);
+		events.flush();
+		replay(a, null);
+	}
+
+	@Override
+	@Transactional
+	public AccountRef lowerRate(long accountId, InterestRate rate, LocalDate validFrom, String reason) {
+		LoanAccount a = find(accountId);
+		List<RateTerm> history = rateTerms.findByAccountIdOrderByValidFrom(accountId);
+		InterestRate current = replayer.terms(a).rateAt(validFrom);
+		if (rate.compareTo(current) > 0) {
+			throw new BusinessException("RATE_INVALID", "조정 금리는 현재 적용 이율(" + current.percent() + "%) 이하여야 합니다 (R46)");
+		}
+		if (history.isEmpty()) {
+			throw new BusinessException("RATE_INVALID", "금리 이력이 없습니다");
+		}
+		return changeRate(accountId, rate, validFrom, reason);
 	}
 
 	// ------------------------------------------------------------------ 일마감
