@@ -5,7 +5,6 @@ import dev.arche.common.BusinessException;
 import dev.arche.common.InterestRate;
 import dev.arche.common.Money;
 import dev.arche.common.jpa.NumberGenerator;
-import dev.arche.customer.CustomerView;
 import dev.arche.customer.Customers;
 import dev.arche.origination.ApplicationStatus;
 import dev.arche.origination.LoanDisbursed;
@@ -18,8 +17,12 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.Period;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 interface LoanApplicationRepository extends JpaRepository<LoanApplication, Long> {
 
 	List<LoanApplication> findAllByOrderByIdDesc();
+
+	List<LoanApplication> findByStatusOrderByIdDesc(ApplicationStatus status);
+
+	List<LoanApplication> findByCustomerId(long customerId);
+
+	Optional<LoanApplication> findByIntakeSourceAndExternalRef(String intakeSource, String externalRef);
 }
 
 interface ApplicationStatusHistoryRepository extends JpaRepository<ApplicationStatusHistory, Long> {
@@ -36,18 +45,23 @@ interface ApplicationStatusHistoryRepository extends JpaRepository<ApplicationSt
 }
 
 /**
- * 신청 → 심사 → 승인 → 약정 → 실행 (MVP 한 줄기). 실행 시 LoanDisbursed 이벤트를 발행하고,
+ * 신청 → 사전심사(자동 거절) → 배정 → 심사(서류) → 승인 → 약정 → 실행. 실행 시 LoanDisbursed 이벤트를 발행하고,
  * Spring Modulith가 같은 트랜잭션에서 발행 기록을 남겨 유실을 막는다 (Transactional Outbox).
  */
 @Service
 class ApplicationService {
 
+	private static final Logger log = LoggerFactory.getLogger(ApplicationService.class);
+
 	/** 심사 승인 전결: 1,000만원 이하 심사역, 초과는 심사팀장 (정책서 7장) */
 	static final Money APPROVAL_THRESHOLD = Money.won(10_000_000);
-	static final int MIN_AGE = 19;
+	static final String MANUAL_REJECT_CODE = "UNDERWRITING_DECLINE";
 
 	private final LoanApplicationRepository applications;
 	private final ApplicationStatusHistoryRepository history;
+	private final ScreeningService screening;
+	private final DocumentService documents;
+	private final AssignmentService assignment;
 	private final ProductCatalog products;
 	private final Customers customers;
 	private final StaffDirectory staff;
@@ -57,10 +71,14 @@ class ApplicationService {
 	private final Clock clock;
 
 	ApplicationService(LoanApplicationRepository applications, ApplicationStatusHistoryRepository history,
+			ScreeningService screening, DocumentService documents, AssignmentService assignment,
 			ProductCatalog products, Customers customers, StaffDirectory staff, BusinessDates businessDates,
 			NumberGenerator numbers, ApplicationEventPublisher events, Clock clock) {
 		this.applications = applications;
 		this.history = history;
+		this.screening = screening;
+		this.documents = documents;
+		this.assignment = assignment;
 		this.products = products;
 		this.customers = customers;
 		this.staff = staff;
@@ -70,19 +88,55 @@ class ApplicationService {
 		this.clock = clock;
 	}
 
+	/**
+	 * 모든 채널의 접수 (guide 2.1). 같은 채널 신청 번호로 다시 오면 기존 신청을 돌려준다(재전송 안전).
+	 * 직원 입력이 아닌 채널은 사전심사·배정까지 자동으로 진행한다 (R57).
+	 */
 	@Transactional
-	LoanApplication receive(long customerId, String productCode, long amount, int termMonths, int graceMonths,
-			int dueDay) {
-		products.current(productCode);
-		customers.get(customerId);
-		LoanApplication a = applications.save(new LoanApplication(numbers.next("application_no_seq", "A"),
-				customerId, productCode, amount, termMonths, graceMonths, dueDay));
-		record(a, null, ApplicationStatus.RECEIVED, "접수");
+	LoanApplication intake(ApplicationIntakeCommand c) {
+		if (c.intakeSource() != null && c.externalRef() != null) {
+			Optional<LoanApplication> existing = applications.findByIntakeSourceAndExternalRef(c.intakeSource(),
+					c.externalRef());
+			if (existing.isPresent()) {
+				return existing.get();
+			}
+		}
+		ProductView product = products.current(c.productCode());
+		if ("N1".equals(product.code())) {
+			throw new BusinessException("PRODUCT_NOT_APPLICABLE", "매입채권 상품은 신청을 받지 않습니다");
+		}
+		product.validate(Money.won(c.requestedAmount()), c.termMonths(), c.graceMonths(), product.defaultRate());
+		customers.get(c.customerId());
+		LoanApplication a = applications.save(new LoanApplication(numbers.next("application_no_seq", "A"), c));
+		record(a, null, ApplicationStatus.RECEIVED, "접수 (" + channelLabel(c.channel()) + ")");
+		if (c.consent() != null) {
+			screening.recordConsent(a, c.consent().channel(), c.consent().agreedOn(), c.consent().evidence());
+		}
+		documents.createChecklist(a);
+		if (c.channel() != LoanApplication.Channel.STAFF) {
+			autoProceed(a);
+		}
 		return a;
 	}
 
+	/** 비대면 채널: 사전심사 → 통과하면 자동 배정. 배정할 심사역이 없으면 사전심사 상태로 둔다 */
+	private void autoProceed(LoanApplication a) {
+		if (preScreen(a)) {
+			return;
+		}
+		Optional<CurrentStaff> chosen = assignment.assignAuto(a);
+		if (chosen.isEmpty()) {
+			log.warn("신청 {} 자동 배정 보류: {} 담당 심사역 없음", a.applicationNo(), a.productCode());
+			return;
+		}
+		ApplicationStatus from = a.moveTo(ApplicationStatus.ASSIGNED);
+		record(a, from, ApplicationStatus.ASSIGNED,
+				"자동 배정 (" + assignment.strategyCode() + ") " + chosen.get().name());
+	}
+
 	@Transactional
-	LoanApplication transition(long id, ApplicationStatus next, String reason) {
+	LoanApplication transition(long id, ApplicationStatus next, @Nullable String reason, @Nullable String reasonCode,
+			@Nullable Long underwriterId) {
 		LoanApplication a = find(id);
 		if (next == ApplicationStatus.APPROVED || next == ApplicationStatus.DISBURSED) {
 			throw new BusinessException("TRANSITION_INVALID", "승인·실행은 전용 API를 사용하세요");
@@ -90,26 +144,69 @@ class ApplicationService {
 		if (next == ApplicationStatus.REJECTED && (reason == null || reason.isBlank())) {
 			throw new BusinessException("REASON_REQUIRED", "거절 사유가 필요합니다");
 		}
-		if (next == ApplicationStatus.PRE_SCREENING && autoRejected(a)) {
+		if (next == ApplicationStatus.PRE_SCREENING) {
+			preScreen(a);
 			return a;
 		}
 		if (next == ApplicationStatus.ASSIGNED) {
-			a.assign(staff.current().id());
+			if (!a.status().canMoveTo(ApplicationStatus.ASSIGNED)) {
+				throw new BusinessException("TRANSITION_INVALID", a.status() + " → ASSIGNED 전이는 허용되지 않습니다");
+			}
+			String how;
+			if (underwriterId != null) {
+				requireAssignPermission();
+				how = "수동 배정 " + assignment.assignManual(a, underwriterId).name();
+			} else {
+				how = "자동 배정 (" + assignment.strategyCode() + ") " + assignment.assignAuto(a)
+						.orElseThrow(() -> AssignmentService.noUnderwriter(a.productCode())).name();
+			}
+			ApplicationStatus from = a.moveTo(ApplicationStatus.ASSIGNED);
+			record(a, from, ApplicationStatus.ASSIGNED, reason == null || reason.isBlank() ? how : how + " — " + reason);
+			return a;
 		}
 		ApplicationStatus from = a.moveTo(next);
+		if (next == ApplicationStatus.REJECTED) {
+			a.rejected(reasonCode == null || reasonCode.isBlank() ? MANUAL_REJECT_CODE : reasonCode,
+					businessDates.today());
+		}
 		record(a, from, next, reason);
 		return a;
 	}
 
-	/** 자동 거절: 만 19세 미만 (정책서 7장). 신용조회·거절 이력 규칙은 확장 지점 */
-	private boolean autoRejected(LoanApplication a) {
-		CustomerView c = customers.get(a.customerId());
-		if (Period.between(c.birthDate(), businessDates.today()).getYears() >= MIN_AGE) {
+	/**
+	 * 사전심사 진입 + 자동 거절 규칙 (R53). 거절이면 바로 REJECTED로 보내고 true
+	 */
+	private boolean preScreen(LoanApplication a) {
+		ApplicationStatus from = a.moveTo(ApplicationStatus.PRE_SCREENING);
+		record(a, from, ApplicationStatus.PRE_SCREENING, "사전심사");
+		List<ScreeningRules.Result> results = screening.screen(a);
+		List<ScreeningRules.Result> rejected = results.stream().filter(ScreeningRules.Result::rejected).toList();
+		if (rejected.isEmpty()) {
 			return false;
 		}
-		ApplicationStatus from = a.moveTo(ApplicationStatus.REJECTED);
-		record(a, from, ApplicationStatus.REJECTED, "자동 거절: 만 19세 미만");
+		a.moveTo(ApplicationStatus.REJECTED);
+		a.rejected(rejected.getFirst().rule().name(), businessDates.today());
+		record(a, ApplicationStatus.PRE_SCREENING, ApplicationStatus.REJECTED, "자동 거절: "
+				+ rejected.stream().map(r -> r.rule().label).collect(Collectors.joining(", ")));
 		return true;
+	}
+
+	/** 배정된 신청의 심사자 바꾸기 (심사팀장·본부장, R55). 상태는 그대로 두고 이력에 남긴다 */
+	@Transactional
+	LoanApplication reassign(long id, long underwriterId, String reason) {
+		requireAssignPermission();
+		LoanApplication a = find(id);
+		if (a.status() != ApplicationStatus.ASSIGNED && a.status() != ApplicationStatus.UNDERWRITING) {
+			throw new BusinessException("APPLICATION_STATE", "배정·심사 중인 신청만 재배정할 수 있습니다");
+		}
+		if (reason == null || reason.isBlank()) {
+			throw new BusinessException("REASON_REQUIRED", "재배정 사유를 입력하세요");
+		}
+		Long before = a.underwriterId();
+		String to = assignment.assignManual(a, underwriterId).name();
+		String fromName = before == null ? "-" : staff.byId(before).map(CurrentStaff::name).orElse("#" + before);
+		record(a, a.status(), a.status(), "재배정 " + fromName + " → " + to + ": " + reason);
+		return a;
 	}
 
 	@Transactional
@@ -123,8 +220,13 @@ class ApplicationService {
 		}
 		ProductView product = products.current(a.productCode());
 		product.validate(Money.won(amount), a.termMonths(), a.graceMonths(), new InterestRate(rate));
-		a.approve(amount, rate);
+		List<DocumentType> missing = documents.missingRequired(a.getId());
+		if (!missing.isEmpty()) {
+			throw new BusinessException("DOCUMENTS_INCOMPLETE", "확인되지 않은 필수 서류가 있습니다: "
+					+ missing.stream().map(d -> d.label).collect(Collectors.joining(", ")));
+		}
 		ApplicationStatus from = a.moveTo(ApplicationStatus.APPROVED);
+		a.approve(amount, rate, businessDates.today());
 		record(a, from, ApplicationStatus.APPROVED, "승인 " + amount + "원, " + rate + "%");
 		return a;
 	}
@@ -150,9 +252,24 @@ class ApplicationService {
 				.orElseThrow(() -> new BusinessException("APPLICATION_NOT_FOUND", "신청이 없습니다"));
 	}
 
+	private void requireAssignPermission() {
+		if (!staff.current().has(Permission.APPLICATION_ASSIGN)) {
+			throw new BusinessException("FORBIDDEN", "심사자 수동 배정은 심사팀장·본부장만 할 수 있습니다 (R55)");
+		}
+	}
+
+	static String channelLabel(LoanApplication.Channel c) {
+		return switch (c) {
+			case STAFF -> "직원 입력";
+			case BROKER -> "중개업자";
+			case PLATFORM -> "대출 비교 플랫폼";
+		};
+	}
+
 	private void record(LoanApplication a, ApplicationStatus from, ApplicationStatus to, String reason) {
 		String actor = staff.currentIfAny().map(CurrentStaff::loginId).orElse("system");
+		String text = reason != null && reason.length() > 200 ? reason.substring(0, 200) : reason;
 		history.save(new ApplicationStatusHistory(a.getId(), from == null ? null : from.name(), to.name(), actor,
-				reason, OffsetDateTime.now(clock)));
+				text, OffsetDateTime.now(clock)));
 	}
 }

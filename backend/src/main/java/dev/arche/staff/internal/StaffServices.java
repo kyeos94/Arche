@@ -35,6 +35,8 @@ interface StaffRepository extends JpaRepository<Staff, Long> {
 	Optional<Staff> findByLoginId(String loginId);
 
 	List<Staff> findByTeamId(Long teamId);
+
+	List<Staff> findByRoleAndEnabledTrueAndLockedFalseOrderById(Role role);
 }
 
 interface AccessLogRepository extends JpaRepository<AccessLogEntry, Long> {
@@ -112,6 +114,12 @@ class DefaultStaffDirectory implements StaffDirectory {
 	@Transactional(readOnly = true)
 	public Optional<CurrentStaff> byLoginId(String loginId) {
 		return staff.findByLoginId(loginId).map(Staff::toCurrent);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<CurrentStaff> activeByRole(Role role) {
+		return staff.findByRoleAndEnabledTrueAndLockedFalseOrderById(role).stream().map(Staff::toCurrent).toList();
 	}
 }
 

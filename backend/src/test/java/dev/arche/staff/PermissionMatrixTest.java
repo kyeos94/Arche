@@ -37,6 +37,7 @@ class PermissionMatrixTest {
 			LOAN_CREATE                | - - - - - O -
 			COLLECTION_ACTIVITY        | - - O O - O -
 			LEGAL_EVENT                | - - - O - O -
+			APPLICATION_ASSIGN         | - O - - - O -
 			""")
 	void 정책서_9_1_권한표와_같다(Permission permission, String row) {
 		List<String> marks = Arrays.asList(row.trim().split("\\s+"));

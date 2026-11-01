@@ -102,6 +102,17 @@ class CustomerService implements Customers {
 		return c.residentNo();
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public String residentNoForCreditInquiry(long id, String consentRef) {
+		if (consentRef == null || consentRef.isBlank()) {
+			throw new BusinessException("CONSENT_REQUIRED", "신용조회 동의가 없습니다");
+		}
+		Customer c = find(id);
+		accessLog.log("CREDIT_INQUIRY_ID_USE", "CUSTOMER", String.valueOf(id), "신용조회 (" + consentRef + ")");
+		return c.residentNo();
+	}
+
 	private Customer find(long id) {
 		return customers.findById(id).orElseThrow(() -> new BusinessException("CUSTOMER_NOT_FOUND", "고객이 없습니다"));
 	}

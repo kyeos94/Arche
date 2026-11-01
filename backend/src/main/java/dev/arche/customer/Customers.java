@@ -48,6 +48,12 @@ public interface Customers {
 		return SearchKind.NAME;
 	}
 
+	/**
+	 * 신용조회 기관에 보낼 식별번호 원문 (시스템 간 전송용, 화면 표시 금지). 호출자가 유효한 신용조회 동의를 확인한 뒤
+	 * 그 동의 참조와 함께 부른다 (guide 11.2). 사용 사실은 접근 기록에 남긴다
+	 */
+	String residentNoForCreditInquiry(long id, String consentRef);
+
 	/** 식별번호 원문 조회 (고객 식별번호 원문 조회 권한 + 사유, 접근 기록) */
 	String revealResidentNo(long id, String reason);
 }
