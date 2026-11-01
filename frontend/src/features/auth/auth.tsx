@@ -44,8 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe: (next) => client.setQueryData(queryKeys.me, next),
     logout: async () => {
       await endpoints.logout().catch(() => undefined)
-      client.clear()
+      // me를 먼저 null로 바꿔 화면을 로그인 창으로 돌린다. clear()로 me 쿼리까지 지우면 화면이 구독하던 쿼리가
+      // 사라져 새로 넣은 null을 받지 못한다 (로그아웃 무반응 버그)
       client.setQueryData(queryKeys.me, null)
+      client.removeQueries({ predicate: (q) => q.queryKey[0] !== queryKeys.me[0] })
       await endpoints.csrf().catch(() => undefined)
     },
   }

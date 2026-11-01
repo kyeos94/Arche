@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useNavigate } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ const nav: { to: string; label: string; permission?: string }[] = [
 
 export function Layout() {
   const { me, can, logout } = useAuth()
+  const navigate = useNavigate()
   const { data: bd } = useQuery({ queryKey: queryKeys.businessDate, queryFn: endpoints.businessDate })
   const prefs = usePreferences()
   const top = prefs.nav === 'top'
@@ -76,7 +77,15 @@ export function Layout() {
           >
             {top ? '메뉴 왼쪽' : '메뉴 상단'}
           </Button>
-          <Button size="sm" variant="outline" className="text-foreground" onClick={() => void logout()}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-foreground"
+            onClick={async () => {
+              await logout()
+              navigate('/', { replace: true })
+            }}
+          >
             로그아웃
           </Button>
         </div>
