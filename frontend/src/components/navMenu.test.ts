@@ -13,7 +13,7 @@ describe('주 메뉴 대분류', () => {
     const groups = visibleGroups(only('loan.read'))
     expect(groups.map((g) => g.label)).toEqual(['여신관리', '회수관리', '시스템설정'])
     expect(groups[0].items.map((i) => i.label)).toEqual(['계약 목록'])
-    expect(groups[2].items.map((i) => i.label)).toEqual(['내 계정'])
+    expect(groups[2].items.map((i) => i.label)).toEqual(['내 계정', '쪽지함'])
   })
 
   it('anyOf 권한은 하나만 있어도 보인다', () => {

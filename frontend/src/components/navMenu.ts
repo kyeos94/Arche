@@ -50,6 +50,7 @@ export const SCREENS: Record<string, Screen> = {
   '/message-templates': { label: '문자 템플릿', permission: 'admin.manage' },
   '/credit-reports': { label: '신용정보 보고', permission: 'admin.manage' },
   '/account': { label: '내 계정' },
+  '/notes': { label: '쪽지함' },
 }
 
 /** 메뉴에서 뺄 수 없는 화면 (서버 MenuAdminService.REQUIRED_PATHS와 같음) */
@@ -62,7 +63,7 @@ export interface MenuGroupInput {
   items: { path: string; label: string }[]
 }
 
-/** 처음 설치했을 때의 메뉴 (V18·V22 시드와 같음) */
+/** 처음 설치했을 때의 메뉴 (V18·V22·V23 시드와 같음) */
 export const DEFAULT_MENU: MenuGroupInput[] = [
   {
     label: '대출신청관리',
@@ -77,7 +78,7 @@ export const DEFAULT_MENU: MenuGroupInput[] = [
   { label: '보고서', items: ['/reports'].map(seed) },
   {
     label: '시스템설정',
-    // '/admin/holidays'는 V22에서 그룹 끝에 붙였으므로 여기서도 끝에 둔다
+    // '/admin/holidays'(V22)·'/notes'(V23)는 마이그레이션에서 그룹 끝에 붙였으므로 여기서도 끝에 둔다
     items: [
       '/admin',
       '/admin/menus',
@@ -86,6 +87,7 @@ export const DEFAULT_MENU: MenuGroupInput[] = [
       '/credit-reports',
       '/account',
       '/admin/holidays',
+      '/notes',
     ].map(seed),
   },
 ]

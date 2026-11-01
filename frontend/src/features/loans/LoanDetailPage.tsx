@@ -14,6 +14,8 @@ import { CollateralTab } from '@/features/collateral/CollateralTab'
 import { TimelinePanel } from '@/features/communication/TimelinePanel'
 import { LifecycleTab } from '@/features/lifecycle/LifecycleTab'
 import { PrintTab } from '@/features/documents/PrintTab'
+import { NoteComposeDialog } from '@/features/notes/NoteComposeDialog'
+import { Button } from '@/components/ui/button'
 import { CollectionTab } from './CollectionTab'
 import { DueDayChangeDialog, PaymentDialog, RateChangeDialog, RevealDialog, WorkoutDialog } from './dialogs'
 import { SummaryBar } from './SummaryBar'
@@ -80,6 +82,7 @@ function Terms({ loan }: { loan: LoanDetail }) {
 export function LoanDetailPage() {
   const id = Number(useParams().id)
   const [tab, setTab] = useState('schedule')
+  const [compose, setCompose] = useState(false)
   const { can } = useAuth()
   const q = useQuery({ queryKey: queryKeys.loan(id), queryFn: () => endpoints.loan(id) })
 
@@ -97,6 +100,9 @@ export function LoanDetailPage() {
           ← 계약 목록
         </Link>
         <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => setCompose(true)}>
+            쪽지 보내기
+          </Button>
           <Can permission="payment.register">{open && <PaymentDialog loan={loan} />}</Can>
           <Can permission="loan.term.change">
             {changeable && loan.repaymentMethod !== 'ACQUIRED' && (
@@ -114,6 +120,12 @@ export function LoanDetailPage() {
           </Can>
         </div>
       </div>
+      {compose && (
+        <NoteComposeDialog
+          initial={{ ref: { type: 'LOAN', id: loan.id, label: loan.accountNo } }}
+          onClose={() => setCompose(false)}
+        />
+      )}
       <SummaryBar loan={loan} />
       {/* 3단 구성 (guide 13.2): 요약 바 / 중앙 탭 / 우측 연락 타임라인 */}
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">

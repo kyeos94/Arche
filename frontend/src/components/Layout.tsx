@@ -8,6 +8,7 @@ import { type NavGroup, NAV_GROUPS, activeItem, toNavGroups, visibleGroups } fro
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth'
+import { NoteBadge } from '@/features/notes/NoteBadge'
 import { formatDate } from '@/lib/format'
 import { THEME_LABEL, THEME_ORDER, setPreferences, toggleCollapsed, usePreferences } from '@/lib/preferences'
 import { cn } from '@/lib/utils'
@@ -36,6 +37,7 @@ export function Layout() {
         </div>
         <div className="flex items-center gap-2 text-xs">
           {can('loan.read') && <GlobalSearch />}
+          <NoteBadge />
           <NavLink to="/account" className="mr-1 hover:underline" title="내 계정">
             {me?.name} · {me?.roleLabel}
           </NavLink>
