@@ -11,6 +11,7 @@ import { LoanListPage } from '@/features/loans/LoanListPage'
 import { NewLoanPage } from '@/features/loans/NewLoanPage'
 import { CorrectionsPage } from '@/features/payments/CorrectionsPage'
 import { UnmatchedPage } from '@/features/payments/UnmatchedPage'
+import { ReportsPage } from '@/features/reports/ReportsPage'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
         <Route path="unmatched" element={<UnmatchedPage />} />
         <Route path="corrections" element={<CorrectionsPage />} />
         <Route path="bulk" element={<BulkPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route
           path="account"

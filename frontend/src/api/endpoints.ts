@@ -1,4 +1,6 @@
+import { downloadXlsx } from './download'
 import { api, qs } from './client'
+import type { DailyReport, JournalReport, MonthEnd, Provision, ReportKind, RollRate } from './reportTypes'
 import type {
   AccessLogRow,
   AccountRef,
@@ -60,6 +62,11 @@ export const queryKeys = {
   staff: ['admin', 'staff'] as const,
   accessLogs: ['admin', 'access-logs'] as const,
   products: ['products'] as const,
+  reportDaily: (date: string) => ['reports', 'daily', date] as const,
+  reportJournal: (date: string) => ['reports', 'journal', date] as const,
+  reportMonths: ['reports', 'months'] as const,
+  reportRollRate: (month: string) => ['reports', 'roll-rate', month] as const,
+  reportProvision: (month: string) => ['reports', 'provision', month] as const,
 }
 
 export interface LoanSearch {
@@ -187,4 +194,15 @@ export const endpoints = {
   staff: () => api.get<StaffRow[]>('/api/admin/staff'),
   unlockStaff: (id: number) => api.post<void>(`/api/admin/staff/${id}/unlock`),
   accessLogs: () => api.get<AccessLogRow[]>('/api/admin/access-logs'),
+
+  // 보고서 (R65~R68). date·month가 빈 값이면 서버가 현재 업무일자 기준
+  reportDaily: (date: string) => api.get<DailyReport>(`/api/reports/daily${qs({ date })}`),
+  reportJournal: (date: string) => api.get<JournalReport>(`/api/reports/journal${qs({ date })}`),
+  reportMonths: () => api.get<MonthEnd[]>('/api/reports/months'),
+  reportRollRate: (month: string) => api.get<RollRate>(`/api/reports/roll-rate${qs({ month })}`),
+  reportProvision: (month: string) => api.get<Provision>(`/api/reports/provision${qs({ month })}`),
+  exportLoans: (body: { status?: string; q?: string; reason: string }) =>
+    downloadXlsx('/api/exports/loans', body, 'loans.xlsx'),
+  exportReport: (body: { kind: ReportKind; date?: string; month?: string; reason: string }) =>
+    downloadXlsx('/api/exports/reports', body, 'report.xlsx'),
 }

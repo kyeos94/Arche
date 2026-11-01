@@ -49,7 +49,9 @@ public enum Permission {
 	/** 추심 연락 기록·분할납부 약속 등록 (R37) */
 	COLLECTION_ACTIVITY("collection.activity", COLLECTOR, COLLECTION_LEAD, HEAD),
 	/** 소멸시효 중단 사유(지급명령·압류·판결 확정) 기록 (R37) */
-	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD);
+	LEGAL_EVENT("collection.legal", COLLECTION_LEAD, HEAD),
+	/** 보고서 조회 (R68: 개인정보 없는 회사 전체 집계 — 엑셀 다운로드 권한자 + 시스템관리자) */
+	REPORT_READ("report.read", UNDERWRITING_LEAD, COLLECTION_LEAD, TELLER, HEAD, SYSTEM_ADMIN);
 
 	private final String code;
 	private final Set<Role> roles;

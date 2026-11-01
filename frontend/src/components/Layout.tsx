@@ -16,6 +16,7 @@ const nav: { to: string; label: string; permission?: string }[] = [
   { to: '/unmatched', label: '미확인 입금', permission: 'payment.register' },
   { to: '/corrections', label: '정정 승인', permission: 'payment.cancel.closed.approve' },
   { to: '/bulk', label: '입금 일괄 등록', permission: 'payment.register' },
+  { to: '/reports', label: '보고서', permission: 'report.read' },
   { to: '/admin', label: '운영 관리', permission: 'admin.manage' },
   { to: '/account', label: '내 계정' },
 ]
