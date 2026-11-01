@@ -5,6 +5,7 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth'
 import { formatDate } from '@/lib/format'
+import { THEME_LABEL, THEME_ORDER, setPreferences, usePreferences } from '@/lib/preferences'
 import { cn } from '@/lib/utils'
 
 const nav: { to: string; label: string; permission?: string }[] = [
@@ -21,6 +22,27 @@ const nav: { to: string; label: string; permission?: string }[] = [
 export function Layout() {
   const { me, can, logout } = useAuth()
   const { data: bd } = useQuery({ queryKey: queryKeys.businessDate, queryFn: endpoints.businessDate })
+  const prefs = usePreferences()
+  const top = prefs.nav === 'top'
+  const items = nav.filter((n) => !n.permission || can(n.permission))
+  const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(prefs.theme) + 1) % THEME_ORDER.length]
+
+  const links = items.map((n) => (
+    <li key={n.to}>
+      <NavLink
+        to={n.to}
+        end={n.to === '/loans'}
+        className={({ isActive }) =>
+          cn(
+            'block rounded px-2 py-1.5 text-xs whitespace-nowrap',
+            isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+          )
+        }
+      >
+        {n.label}
+      </NavLink>
+    </li>
+  ))
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -31,38 +53,45 @@ export function Layout() {
             업무일자 {formatDate(bd?.businessDate)}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="mr-1">
             {me?.name} · {me?.roleLabel}
           </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-foreground"
+            title={`테마: ${THEME_LABEL[prefs.theme]} (누르면 ${THEME_LABEL[nextTheme]})`}
+            aria-label={`테마 전환, 현재 ${THEME_LABEL[prefs.theme]}`}
+            onClick={() => setPreferences({ theme: nextTheme })}
+          >
+            {prefs.theme === 'dark' ? '🌙' : prefs.theme === 'light' ? '☀️' : '🖥️'} {THEME_LABEL[prefs.theme]}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-foreground"
+            aria-label={top ? '메뉴를 왼쪽으로' : '메뉴를 상단으로'}
+            onClick={() => setPreferences({ nav: top ? 'side' : 'top' })}
+          >
+            {top ? '메뉴 왼쪽' : '메뉴 상단'}
+          </Button>
           <Button size="sm" variant="outline" className="text-foreground" onClick={() => void logout()}>
             로그아웃
           </Button>
         </div>
       </header>
-      <div className="flex flex-1">
-        <nav className="w-40 shrink-0 border-r bg-muted/50 p-2">
-          <ul className="space-y-0.5">
-            {nav
-              .filter((n) => !n.permission || can(n.permission))
-              .map((n) => (
-                <li key={n.to}>
-                  <NavLink
-                    to={n.to}
-                    end={n.to === '/loans'}
-                    className={({ isActive }) =>
-                      cn(
-                        'block rounded px-2 py-1.5 text-xs',
-                        isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                      )
-                    }
-                  >
-                    {n.label}
-                  </NavLink>
-                </li>
-              ))}
-          </ul>
+      {top && (
+        <nav aria-label="주 메뉴" className="border-b bg-muted/50 px-2 py-1">
+          <ul className="flex flex-wrap gap-0.5">{links}</ul>
         </nav>
+      )}
+      <div className="flex flex-1">
+        {!top && (
+          <nav aria-label="주 메뉴" className="w-40 shrink-0 border-r bg-muted/50 p-2">
+            <ul className="space-y-0.5">{links}</ul>
+          </nav>
+        )}
         <main className="min-w-0 flex-1 p-4">
           {me && me.passwordExpiresInDays >= 0 && (
             <Alert tone="warn" className="mb-3">

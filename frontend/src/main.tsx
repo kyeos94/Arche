@@ -5,7 +5,10 @@ import { BrowserRouter } from 'react-router'
 import { ApiError } from '@/api/client'
 import { App } from './App'
 import { AuthProvider } from './features/auth/auth'
+import { initPreferences } from './lib/preferences'
 import './index.css'
+
+initPreferences()
 
 const queryClient = new QueryClient({
   defaultOptions: {
