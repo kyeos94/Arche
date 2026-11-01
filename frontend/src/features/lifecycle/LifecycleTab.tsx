@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, THead, TR, Table } from '@/components/ui/table'
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatMoney, statusLabel } from '@/lib/format'
 import { ADJUSTMENT_TYPES, adjustmentRequestSchema, saleSchema, transferSchema } from '@/lib/lifecycleSchemas'
+import { useSort } from '@/lib/useSort'
 import { ReasonDialog, RequestsTable, useInvalidateLifecycle } from './shared'
 
 /** 생애주기 탭: 상각(R39)·매각(R40)·환매(R41)·양수인 이전, 수기 조정·상계·상태 되돌리기 요청(R42~R44) */
@@ -228,6 +229,15 @@ function TransferDialog({ loanId, pending }: { loanId: number; pending: number }
 }
 
 function SalesCard({ info }: { info: Lifecycle }) {
+  const { sorted, header } = useSort(info.sales, {
+    soldOn: (s) => s.soldOn,
+    buyer: (s) => s.buyer,
+    salePrice: (s) => s.salePrice,
+    noticeSentOn: (s) => s.noticeSentOn,
+    deadline: (s) => s.repurchaseDeadline,
+    status: (s) => statusLabel(s.status),
+    repurchasedOn: (s) => s.repurchasedOn,
+  })
   return (
     <Card>
       <CardHeader>
@@ -237,18 +247,20 @@ function SalesCard({ info }: { info: Lifecycle }) {
         <Table>
           <THead>
             <TR>
-              <TH>매각일</TH>
-              <TH>양수인</TH>
-              <TH className="text-right">매각가</TH>
-              <TH>양도 통지</TH>
-              <TH>환매 마감</TH>
-              <TH>상태</TH>
-              <TH>환매</TH>
+              <SortTH {...header('soldOn')}>매각일</SortTH>
+              <SortTH {...header('buyer')}>양수인</SortTH>
+              <SortTH {...header('salePrice')} className="text-right">
+                매각가
+              </SortTH>
+              <SortTH {...header('noticeSentOn')}>양도 통지</SortTH>
+              <SortTH {...header('deadline')}>환매 마감</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <SortTH {...header('repurchasedOn')}>환매</SortTH>
             </TR>
           </THead>
           <TBody>
             {info.sales.length === 0 && <EmptyRow colSpan={7} />}
-            {info.sales.map((s) => (
+            {sorted.map((s) => (
               <TR key={s.id}>
                 <TD>{formatDate(s.soldOn)}</TD>
                 <TD>{s.buyer}</TD>
@@ -272,7 +284,20 @@ function SalesCard({ info }: { info: Lifecycle }) {
   )
 }
 
+const setoffDirection = (direction: string) => (direction === 'IN' ? '받음 (이 계약 채무 충당)' : '보냄 (이 계약 잔액에서)')
+const setoffSource = (source: string | null) =>
+  source === 'REFUND' ? '반환 대기' : source === 'SUSPENSE' ? '가수금' : '-'
+
 function SetoffsCard({ info }: { info: Lifecycle }) {
+  const { sorted, header } = useSort(info.setoffs, {
+    id: (s) => s.eventId,
+    direction: (s) => setoffDirection(s.direction),
+    date: (s) => s.date,
+    amount: (s) => s.amount,
+    counterpart: (s) => s.counterpartAccountNo,
+    source: (s) => (s.source ? setoffSource(s.source) : null),
+    status: (s) => statusLabel(s.status),
+  })
   return (
     <Card>
       <CardHeader>
@@ -282,24 +307,26 @@ function SetoffsCard({ info }: { info: Lifecycle }) {
         <Table>
           <THead>
             <TR>
-              <TH>#</TH>
-              <TH>방향</TH>
-              <TH>상계일</TH>
-              <TH className="text-right">금액</TH>
-              <TH>상대 계약</TH>
-              <TH>원천</TH>
-              <TH>상태</TH>
+              <SortTH {...header('id')}>#</SortTH>
+              <SortTH {...header('direction')}>방향</SortTH>
+              <SortTH {...header('date')}>상계일</SortTH>
+              <SortTH {...header('amount')} className="text-right">
+                금액
+              </SortTH>
+              <SortTH {...header('counterpart')}>상대 계약</SortTH>
+              <SortTH {...header('source')}>원천</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
             </TR>
           </THead>
           <TBody>
-            {info.setoffs.map((s) => (
+            {sorted.map((s) => (
               <TR key={s.eventId}>
                 <TD>{s.eventId}</TD>
-                <TD>{s.direction === 'IN' ? '받음 (이 계약 채무 충당)' : '보냄 (이 계약 잔액에서)'}</TD>
+                <TD>{setoffDirection(s.direction)}</TD>
                 <TD>{formatDate(s.date)}</TD>
                 <TD className="num">{formatMoney(s.amount)}</TD>
                 <TD>{s.counterpartAccountNo ?? '-'}</TD>
-                <TD>{s.source === 'REFUND' ? '반환 대기' : s.source === 'SUSPENSE' ? '가수금' : '-'}</TD>
+                <TD>{setoffSource(s.source)}</TD>
                 <TD>
                   <StatusBadge status={s.status} />
                 </TD>

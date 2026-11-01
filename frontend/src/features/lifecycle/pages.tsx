@@ -4,14 +4,23 @@ import { Link } from 'react-router'
 import { lifecycleApi, lifecycleKeys } from '@/api/lifecycle'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatMoney } from '@/lib/format'
+import { useSort } from '@/lib/useSort'
 import { ReasonDialog, RequestsTable, useInvalidateLifecycle } from './shared'
 
 /** 상각 후보 (R39): 기한이익상실 후 180일 경과 + 기준일 포함 직전 90일 입금 없음. 본부장이 확정 */
 export function ChargeOffCandidatesPage() {
   const q = useQuery({ queryKey: lifecycleKeys.candidates, queryFn: lifecycleApi.candidates })
   const invalidate = useInvalidateLifecycle()
+  const { sorted, header } = useSort(q.data, {
+    accountNo: (c) => c.accountNo,
+    product: (c) => c.productCode,
+    acceleratedOn: (c) => c.acceleratedOn,
+    days: (c) => c.daysSinceAcceleration,
+    lastPaymentOn: (c) => c.lastPaymentOn,
+    claim: (c) => c.claim,
+  })
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">상각 후보</h1>
@@ -23,18 +32,22 @@ export function ChargeOffCandidatesPage() {
       <Table>
         <THead>
           <TR>
-            <TH>계약번호</TH>
-            <TH>상품</TH>
-            <TH>기한이익상실일</TH>
-            <TH className="text-right">경과일</TH>
-            <TH>마지막 입금일</TH>
-            <TH className="text-right">청구 잔액</TH>
+            <SortTH {...header('accountNo')}>계약번호</SortTH>
+            <SortTH {...header('product')}>상품</SortTH>
+            <SortTH {...header('acceleratedOn')}>기한이익상실일</SortTH>
+            <SortTH {...header('days')} className="text-right">
+              경과일
+            </SortTH>
+            <SortTH {...header('lastPaymentOn')}>마지막 입금일</SortTH>
+            <SortTH {...header('claim')} className="text-right">
+              청구 잔액
+            </SortTH>
             <TH />
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {q.data?.map((c) => (
+          {sorted.map((c) => (
             <TR key={c.accountId}>
               <TD>
                 <Link className="text-primary hover:underline" to={`/loans/${c.accountId}`}>

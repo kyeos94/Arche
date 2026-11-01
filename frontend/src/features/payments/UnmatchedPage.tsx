@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useInvalidateLoan } from '@/features/loans/hooks'
 import { formatDate, formatMoney } from '@/lib/format'
 import { unmatchedPaymentSchema } from '@/lib/schemas'
+import { useSort } from '@/lib/useSort'
 
 type Input_ = z.input<typeof unmatchedPaymentSchema>
 type Output_ = z.output<typeof unmatchedPaymentSchema>
@@ -127,6 +128,14 @@ function MatchDialog({ deposit }: { deposit: UnmatchedDeposit }) {
 export function UnmatchedPage() {
   const q = useQuery({ queryKey: queryKeys.unmatched, queryFn: endpoints.unmatched })
   const total = q.data?.reduce((s, d) => s + d.amount, 0) ?? 0
+  const { sorted, header } = useSort(q.data, {
+    id: (d) => d.id,
+    valueDate: (d) => d.valueDate,
+    businessDate: (d) => d.businessDate,
+    amount: (d) => d.amount,
+    depositor: (d) => d.depositorName,
+    bankTxId: (d) => d.bankTxId,
+  })
   return (
     <div className="space-y-3">
       <h1 className="text-base font-semibold">미확인 입금</h1>
@@ -145,18 +154,20 @@ export function UnmatchedPage() {
       <Table>
         <THead>
           <TR>
-            <TH>#</TH>
-            <TH>입금일(은행)</TH>
-            <TH>등록 업무일</TH>
-            <TH className="text-right">금액</TH>
-            <TH>입금자</TH>
-            <TH>거래고유번호</TH>
+            <SortTH {...header('id')}>#</SortTH>
+            <SortTH {...header('valueDate')}>입금일(은행)</SortTH>
+            <SortTH {...header('businessDate')}>등록 업무일</SortTH>
+            <SortTH {...header('amount')} className="text-right">
+              금액
+            </SortTH>
+            <SortTH {...header('depositor')}>입금자</SortTH>
+            <SortTH {...header('bankTxId')}>거래고유번호</SortTH>
             <TH />
           </TR>
         </THead>
         <TBody>
           {q.data?.length === 0 && <EmptyRow colSpan={7} />}
-          {q.data?.map((d) => (
+          {sorted.map((d) => (
             <TR key={d.id}>
               <TD>{d.id}</TD>
               <TD>{formatDate(d.valueDate)}</TD>

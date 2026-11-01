@@ -4,16 +4,17 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { endpoints, queryKeys } from '@/api/endpoints'
-import type { ContactChannel, LoanDetail } from '@/api/types'
+import type { ContactChannel, LoanDetail, PromiseJudgment } from '@/api/types'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { Can } from '@/features/auth/auth'
 import { formatDate, formatDateTime, formatMoney, statusLabel } from '@/lib/format'
 import { promiseSchema } from '@/lib/schemas'
+import { useSort } from '@/lib/useSort'
 import { cn } from '@/lib/utils'
 import { CollectionStopCard } from '@/features/lifecycle/CollectionStopCard'
 
@@ -47,6 +48,12 @@ function LimitationCard({ loanId, businessDate }: { loanId: number; businessDate
     },
   })
   const info = q.data
+  const events = useSort(info?.events, {
+    date: (e) => e.date,
+    type: (e) => statusLabel(e.type),
+    memo: (e) => e.memo,
+    counted: (e) => (e.counted ? '중단·연장' : '기산 전'),
+  })
   return (
     <Card>
       <CardHeader>
@@ -72,14 +79,14 @@ function LimitationCard({ loanId, businessDate }: { loanId: number; businessDate
           <Table>
             <THead>
               <TR>
-                <TH>날짜</TH>
-                <TH>사유</TH>
-                <TH>메모</TH>
-                <TH>반영</TH>
+                <SortTH {...events.header('date')}>날짜</SortTH>
+                <SortTH {...events.header('type')}>사유</SortTH>
+                <SortTH {...events.header('memo')}>메모</SortTH>
+                <SortTH {...events.header('counted')}>반영</SortTH>
               </TR>
             </THead>
             <TBody>
-              {info.events.map((e, i) => (
+              {events.sorted.map((e, i) => (
                 <TR key={i} className={cn(!e.counted && 'text-muted-foreground')}>
                   <TD>{formatDate(e.date)}</TD>
                   <TD>{statusLabel(e.type)}</TD>
@@ -137,6 +144,14 @@ function ContactsCard({ loanId }: { loanId: number }) {
     },
   })
   const data = q.data
+  const { sorted, header } = useSort(data?.contacts, {
+    date: (c) => c.contactDate,
+    contactedAt: (c) => c.contactedAt,
+    channel: (c) => statusLabel(c.channel),
+    result: (c) => statusLabel(c.result),
+    count: (c) => (c.channel === 'STATUTORY_NOTICE' ? null : c.countInWindow),
+    createdBy: (c) => c.createdBy,
+  })
   return (
     <Card>
       <CardHeader>
@@ -184,18 +199,20 @@ function ContactsCard({ loanId }: { loanId: number }) {
         <Table>
           <THead>
             <TR>
-              <TH>날짜</TH>
-              <TH>기록 시각</TH>
-              <TH>수단</TH>
-              <TH>결과</TH>
-              <TH className="text-right">창 안 기존 횟수</TH>
+              <SortTH {...header('date')}>날짜</SortTH>
+              <SortTH {...header('contactedAt')}>기록 시각</SortTH>
+              <SortTH {...header('channel')}>수단</SortTH>
+              <SortTH {...header('result')}>결과</SortTH>
+              <SortTH {...header('count')} className="text-right">
+                창 안 기존 횟수
+              </SortTH>
               <TH>사유·메모</TH>
-              <TH>담당</TH>
+              <SortTH {...header('createdBy')}>담당</SortTH>
             </TR>
           </THead>
           <TBody>
             {data && data.contacts.length === 0 && <EmptyRow colSpan={7} />}
-            {data?.contacts.map((c) => (
+            {sorted.map((c) => (
               <TR key={c.id} className={cn(c.result === 'BLOCKED' && 'text-muted-foreground')}>
                 <TD>{formatDate(c.contactDate)}</TD>
                 <TD>{formatDateTime(c.contactedAt)}</TD>
@@ -279,43 +296,62 @@ function PromisesCard({ loan }: { loan: LoanDetail }) {
               {p.legalReview && <span className="font-semibold text-red-700">법조치 검토 대상</span>}
               {p.memo && <span className="text-muted-foreground">{p.memo}</span>}
             </div>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>회차</TH>
-                  <TH>약속일</TH>
-                  <TH>기한</TH>
-                  <TH className="text-right">판정 대상 입금</TH>
-                  <TH>판정</TH>
-                  <TH className="text-right">연속 불이행</TH>
-                  <TH>처리</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {p.judgments.map((j) => (
-                  <TR key={j.index}>
-                    <TD>{j.index}</TD>
-                    <TD>{formatDate(j.promiseDate)}</TD>
-                    <TD>{formatDate(j.deadline)}</TD>
-                    <TD className="num">{j.fulfilled === null ? '' : formatMoney(j.paid)}</TD>
-                    <TD
-                      className={cn(
-                        j.fulfilled === false && 'text-red-700',
-                        j.fulfilled === null && 'text-muted-foreground',
-                      )}
-                    >
-                      {j.fulfilled === null ? '대기' : j.fulfilled ? '이행' : '불이행'}
-                    </TD>
-                    <TD className="num">{j.fulfilled === null ? '' : j.consecutiveMisses}</TD>
-                    <TD>{j.fulfilled === null ? '' : statusLabel(j.action)}</TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
+            <JudgmentsTable rows={p.judgments} />
           </div>
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+const verdict = (j: PromiseJudgment) => (j.fulfilled === null ? '대기' : j.fulfilled ? '이행' : '불이행')
+
+/** 약속 회차별 판정. 약속마다 하나씩 그려 정렬 상태를 따로 가진다 */
+function JudgmentsTable({ rows }: { rows: PromiseJudgment[] }) {
+  const { sorted, header } = useSort(rows, {
+    index: (j) => j.index,
+    promiseDate: (j) => j.promiseDate,
+    deadline: (j) => j.deadline,
+    paid: (j) => (j.fulfilled === null ? null : j.paid),
+    verdict: (j) => verdict(j),
+    misses: (j) => (j.fulfilled === null ? null : j.consecutiveMisses),
+    action: (j) => (j.fulfilled === null ? null : statusLabel(j.action)),
+  })
+  return (
+    <Table>
+      <THead>
+        <TR>
+          <SortTH {...header('index')}>회차</SortTH>
+          <SortTH {...header('promiseDate')}>약속일</SortTH>
+          <SortTH {...header('deadline')}>기한</SortTH>
+          <SortTH {...header('paid')} className="text-right">
+            판정 대상 입금
+          </SortTH>
+          <SortTH {...header('verdict')}>판정</SortTH>
+          <SortTH {...header('misses')} className="text-right">
+            연속 불이행
+          </SortTH>
+          <SortTH {...header('action')}>처리</SortTH>
+        </TR>
+      </THead>
+      <TBody>
+        {sorted.map((j) => (
+          <TR key={j.index}>
+            <TD>{j.index}</TD>
+            <TD>{formatDate(j.promiseDate)}</TD>
+            <TD>{formatDate(j.deadline)}</TD>
+            <TD className="num">{j.fulfilled === null ? '' : formatMoney(j.paid)}</TD>
+            <TD
+              className={cn(j.fulfilled === false && 'text-red-700', j.fulfilled === null && 'text-muted-foreground')}
+            >
+              {verdict(j)}
+            </TD>
+            <TD className="num">{j.fulfilled === null ? '' : j.consecutiveMisses}</TD>
+            <TD>{j.fulfilled === null ? '' : statusLabel(j.action)}</TD>
+          </TR>
+        ))}
+      </TBody>
+    </Table>
   )
 }
 
@@ -349,6 +385,12 @@ function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: 
   })
   const finish = useMutation({ mutationFn: (id: number) => endpoints.endDeferral(loanId, id), onSuccess: refresh })
   const active = q.data?.find((d) => d.status === 'ACTIVE' && d.endDate >= businessDate)
+  const deferrals = useSort(q.data, {
+    period: (d) => d.startDate,
+    reason: (d) => d.reason,
+    status: (d) => statusLabel(d.status),
+    extended: (d) => d.extended,
+  })
   return (
     <Card>
       <CardHeader>
@@ -392,16 +434,16 @@ function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: 
         <Table>
           <THead>
             <TR>
-              <TH>기간</TH>
-              <TH>사유</TH>
-              <TH>상태</TH>
-              <TH>연장</TH>
+              <SortTH {...deferrals.header('period')}>기간</SortTH>
+              <SortTH {...deferrals.header('reason')}>사유</SortTH>
+              <SortTH {...deferrals.header('status')}>상태</SortTH>
+              <SortTH {...deferrals.header('extended')}>연장</SortTH>
               <TH />
             </TR>
           </THead>
           <TBody>
             {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
-            {q.data?.map((d) => (
+            {deferrals.sorted.map((d) => (
               <TR key={d.id}>
                 <TD>
                   {formatDate(d.startDate)} ~ {formatDate(d.endDate)}
@@ -446,6 +488,12 @@ function DeferralCard({ loanId, businessDate }: { loanId: number; businessDate: 
 
 function MessagesCard({ loanId }: { loanId: number }) {
   const q = useQuery({ queryKey: queryKeys.loanMessages(loanId), queryFn: () => endpoints.messages(loanId) })
+  const { sorted, header } = useSort(q.data, {
+    scheduledDate: (m) => m.scheduledDate,
+    type: (m) => statusLabel(m.type),
+    body: (m) => m.body,
+    status: (m) => statusLabel(m.status),
+  })
   return (
     <Card>
       <CardHeader>
@@ -456,16 +504,16 @@ function MessagesCard({ loanId }: { loanId: number }) {
         <Table>
           <THead>
             <TR>
-              <TH>예정일</TH>
-              <TH>종류</TH>
-              <TH>내용</TH>
-              <TH>상태</TH>
+              <SortTH {...header('scheduledDate')}>예정일</SortTH>
+              <SortTH {...header('type')}>종류</SortTH>
+              <SortTH {...header('body')}>내용</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
               <TH>발송·사유</TH>
             </TR>
           </THead>
           <TBody>
             {q.data && q.data.length === 0 && <EmptyRow colSpan={5} />}
-            {q.data?.map((m) => (
+            {sorted.map((m) => (
               <TR key={m.id} className={cn(m.status === 'SKIPPED' && 'text-muted-foreground')}>
                 <TD>{formatDate(m.scheduledDate)}</TD>
                 <TD>{statusLabel(m.type)}</TD>

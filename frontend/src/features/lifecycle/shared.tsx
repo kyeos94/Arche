@@ -10,10 +10,11 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/auth'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatDate, formatMoney, statusLabel } from '@/lib/format'
 import { reasonSchema } from '@/lib/lifecycleSchemas'
+import { useSort } from '@/lib/useSort'
 
 /** 생애주기 변경 뒤: 계약 쿼리 전부 + 목록·후보·결재 목록 */
 export function useInvalidateLifecycle() {
@@ -111,27 +112,37 @@ export function RequestsTable({ rows, showAccount }: { rows: AdjustmentRequestDt
   })
   const canApprove = can('loan.adjust.approve')
   const cols = showAccount ? 10 : 9
+  const { sorted, header } = useSort(rows, {
+    requestNo: (r) => r.requestNo,
+    type: (r) => adjustmentTypeLabels[r.type],
+    account: (r) => r.accountNo,
+    reason: (r) => r.reason,
+    requestedOn: (r) => r.requestedOn,
+    decidedOn: (r) => r.decidedOn,
+    status: (r) => statusLabel(r.status),
+    consumedOn: (r) => r.consumedOn,
+  })
   return (
     <div className="space-y-2">
       <ErrorMessage error={decide.error} />
       <Table>
         <THead>
           <TR>
-            <TH>요청번호</TH>
-            <TH>유형</TH>
-            {showAccount && <TH>계약</TH>}
+            <SortTH {...header('requestNo')}>요청번호</SortTH>
+            <SortTH {...header('type')}>유형</SortTH>
+            {showAccount && <SortTH {...header('account')}>계약</SortTH>}
             <TH>내용</TH>
-            <TH>사유</TH>
-            <TH>요청</TH>
-            <TH>결재</TH>
-            <TH>상태</TH>
-            <TH>사용일</TH>
+            <SortTH {...header('reason')}>사유</SortTH>
+            <SortTH {...header('requestedOn')}>요청</SortTH>
+            <SortTH {...header('decidedOn')}>결재</SortTH>
+            <SortTH {...header('status')}>상태</SortTH>
+            <SortTH {...header('consumedOn')}>사용일</SortTH>
             <TH />
           </TR>
         </THead>
         <TBody>
           {rows.length === 0 && <EmptyRow colSpan={cols} />}
-          {rows.map((r) => (
+          {sorted.map((r) => (
             <TR key={r.id}>
               <TD>{r.requestNo}</TD>
               <TD>{adjustmentTypeLabels[r.type]}</TD>

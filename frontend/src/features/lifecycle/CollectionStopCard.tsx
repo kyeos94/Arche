@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
+import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { Can } from '@/features/auth/auth'
-import { formatDate, formatRate } from '@/lib/format'
+import { formatDate, formatRate, statusLabel } from '@/lib/format'
 import { STOP_REASONS, collectionStopSchema, reliefSchema } from '@/lib/lifecycleSchemas'
+import { useSort } from '@/lib/useSort'
 import { ReasonDialog, useInvalidateLifecycle } from './shared'
 
 /**
@@ -27,6 +28,15 @@ export function CollectionStopCard({ loanId, businessDate }: { loanId: number; b
   })
   const invalidate = useInvalidateLifecycle()
   const active = q.data?.find((s) => s.status === 'ACTIVE')
+  const { sorted, header } = useSort(q.data, {
+    reason: (s) => s.reasonLabel,
+    effectiveDate: (s) => s.effectiveDate,
+    memo: (s) => s.memo,
+    interest: (s) => (s.suspendsInterest ? '부과 중단' : '변경 없음'),
+    reliefRate: (s) => s.reliefRate,
+    status: (s) => statusLabel(s.status),
+    releasedOn: (s) => s.releasedOn,
+  })
   return (
     <Card>
       <CardHeader>
@@ -46,19 +56,19 @@ export function CollectionStopCard({ loanId, businessDate }: { loanId: number; b
         <Table>
           <THead>
             <TR>
-              <TH>사유</TH>
-              <TH>발생일</TH>
-              <TH>근거</TH>
-              <TH>이자</TH>
-              <TH>조정 금리</TH>
-              <TH>상태</TH>
-              <TH>해제</TH>
+              <SortTH {...header('reason')}>사유</SortTH>
+              <SortTH {...header('effectiveDate')}>발생일</SortTH>
+              <SortTH {...header('memo')}>근거</SortTH>
+              <SortTH {...header('interest')}>이자</SortTH>
+              <SortTH {...header('reliefRate')}>조정 금리</SortTH>
+              <SortTH {...header('status')}>상태</SortTH>
+              <SortTH {...header('releasedOn')}>해제</SortTH>
               <TH />
             </TR>
           </THead>
           <TBody>
             {q.data?.length === 0 && <EmptyRow colSpan={8} />}
-            {q.data?.map((s) => (
+            {sorted.map((s) => (
               <TR key={s.id}>
                 <TD>{s.reasonLabel}</TD>
                 <TD>{formatDate(s.effectiveDate)}</TD>
