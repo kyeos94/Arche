@@ -31,9 +31,9 @@ class NoteIT extends IntegrationTest {
 		assertThat(inbox.get(0).get("sender").asString()).isEqualTo("테스트 COLLECTOR");
 		assertThat(inbox.get(0).get("readAt").isNull()).isTrue();
 
-		// 보낸 사람·받은 사람 말고는 열 수 없다
+		// 보낸 사람·받은 사람 말고는 열 수 없다 (있는지조차 알리지 않도록 없는 쪽지와 같은 404)
 		assertThat(postJson(outsider, "/api/notes/" + id + "/open", Map.of()).andReturn().getResponse().getStatus())
-				.isEqualTo(422);
+				.isEqualTo(404);
 
 		JsonNode opened = ok(postJson(b, "/api/notes/" + id + "/open", Map.of()));
 		assertThat(opened.get("body").asString()).contains("상환 문의");
