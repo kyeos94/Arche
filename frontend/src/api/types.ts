@@ -38,6 +38,9 @@ export interface LoanListItem {
   delinquencyDays: number
   nextDueDate: string | null
   assignedStaffId: number | null
+  assignedStaffName: string | null
+  initialPrincipal: number
+  disbursedOn: string | null
 }
 
 export interface CustomerView {

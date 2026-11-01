@@ -3,13 +3,12 @@
  * 새 작업 = 항목 하나 + 대화상자 컴포넌트 하나 + 서버 API 하나 (권한·데이터 범위·건너뛰기 규칙은 작업마다 서버가 판단).
  *
  * 다음에 붙일 작업 예:
- * - 문자 일괄 발송: { key: 'sms', label: '문자 일괄 발송', permission: 'collection.activity', Dialog: BulkSmsDialog }
- *   (7일 7회·연락 유예는 계약마다 서버가 검사하고 막힌 계약은 건너뜀)
  * - 담당자 일괄 변경: { key: 'assign', label: '담당자 변경', permission: 'loan.term.change', Dialog: BulkAssignDialog }
  * - 속성 일괄 변경(상태 메모·관리 구분 등)
  */
 import type * as React from 'react'
 import type { LoanListItem } from '@/api/types'
+import { BulkSmsDialog } from './BulkSmsDialog'
 import { PrintBulkDialog } from './PrintBulkDialog'
 
 /** 일괄 작업 대화상자가 받는 값 */
@@ -39,5 +38,13 @@ export const bulkActions: BulkAction[] = [
     permissions: ['loan.read', 'document.print'],
     max: 200,
     Dialog: PrintBulkDialog,
+  },
+  {
+    // 7일 7회·연락 유예·추심 중지는 계약마다 서버가 검사하고 막힌 계약은 건너뜀 (ADR 0011)
+    key: 'sms',
+    label: '문자 일괄 발송',
+    permissions: ['loan.read', 'collection.activity'],
+    max: 200,
+    Dialog: BulkSmsDialog,
   },
 ]

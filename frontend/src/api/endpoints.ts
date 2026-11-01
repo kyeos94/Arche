@@ -51,6 +51,7 @@ export const queryKeys = {
   businessDate: ['business-date'] as const,
   loans: (params: LoanSearch) => ['loans', params] as const,
   statusCounts: ['loans', 'status-counts'] as const,
+  loanAssignees: ['loans', 'assignees'] as const,
   loan: (id: number) => ['loan', id] as const,
   loanSchedule: (id: number) => ['loan', id, 'schedule'] as const,
   loanLedger: (id: number) => ['loan', id, 'ledger'] as const,
@@ -82,11 +83,36 @@ export const queryKeys = {
   legalActions: (openOnly: boolean) => ['legal-actions', openOnly] as const,
 }
 
+/** 계약 목록 검색 조건 (ADR 0011). 쿼리스트링 이름 = 서버 ListQuery 필드 이름 */
 export interface LoanSearch {
   status?: string
   q?: string
   page?: number
   size?: number
+  productCode?: string
+  assignedStaffId?: string
+  unassigned?: string
+  principalMin?: string
+  principalMax?: string
+  payoffMin?: string
+  payoffMax?: string
+  delinquencyMin?: string
+  delinquencyMax?: string
+  nextDueFrom?: string
+  nextDueTo?: string
+  disbursedFrom?: string
+  disbursedTo?: string
+  keywordType?: string
+  keyword?: string
+  sort?: string
+  dir?: string
+}
+
+export interface LoanAssignee {
+  id: number
+  name: string
+  roleLabel: string
+  team: string | null
 }
 
 export interface PaymentRequest {
@@ -171,6 +197,7 @@ export const endpoints = {
 
   loans: (p: LoanSearch) => api.get<PageResponse<LoanListItem>>(`/api/loans${qs({ ...p })}`),
   statusCounts: () => api.get<Record<string, number>>('/api/loans/status-counts'),
+  loanAssignees: () => api.get<LoanAssignee[]>('/api/loans/assignees'),
   loan: (id: number) => api.get<LoanDetail>(`/api/loans/${id}`),
   schedule: (id: number) => api.get<Schedule>(`/api/loans/${id}/schedule`),
   ledger: (id: number) => api.get<LedgerDto[]>(`/api/loans/${id}/ledger`),
@@ -245,7 +272,7 @@ export const endpoints = {
   reportMonths: () => api.get<MonthEnd[]>('/api/reports/months'),
   reportRollRate: (month: string) => api.get<RollRate>(`/api/reports/roll-rate${qs({ month })}`),
   reportProvision: (month: string) => api.get<Provision>(`/api/reports/provision${qs({ month })}`),
-  exportLoans: (body: { status?: string; q?: string; reason: string }) =>
+  exportLoans: (body: { filter?: Record<string, string | number | boolean | null>; status?: string; q?: string; reason: string }) =>
     downloadXlsx('/api/exports/loans', body, 'loans.xlsx'),
   exportReport: (body: { kind: ReportKind; date?: string; month?: string; reason: string }) =>
     downloadXlsx('/api/exports/reports', body, 'report.xlsx'),
