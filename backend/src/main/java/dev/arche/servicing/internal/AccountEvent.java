@@ -35,6 +35,8 @@ class AccountEvent extends BaseEntity {
 	private Long waiveNormal;
 	private Long waivePrincipal;
 	private Integer installments;
+	/** 채무자 승인이 아닌 입금 (보증인·제3자·법원 배당 등): 소멸시효 중단으로 세지 않음 (R50). 재생에는 영향 없음 */
+	private boolean limitationExcluded;
 
 	protected AccountEvent() {
 	}
@@ -104,6 +106,18 @@ class AccountEvent extends BaseEntity {
 
 	boolean active() {
 		return "ACTIVE".equals(status);
+	}
+
+	void excludeFromLimitation() {
+		this.limitationExcluded = true;
+	}
+
+	boolean limitationExcluded() {
+		return limitationExcluded;
+	}
+
+	long accountId() {
+		return accountId;
 	}
 
 	Type type() {

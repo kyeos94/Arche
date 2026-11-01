@@ -11,7 +11,16 @@ import org.jspecify.annotations.Nullable;
 public interface Payments {
 
 	enum Channel {
-		VIRTUAL_ACCOUNT, BANK_TRANSFER, AUTO_DEBIT, CASH
+		VIRTUAL_ACCOUNT, BANK_TRANSFER, AUTO_DEBIT, CASH,
+		/** 경매 배당금 (R52) */
+		AUCTION_DISTRIBUTION,
+		/** 공탁금 출급 (R52) */
+		COURT_DEPOSIT;
+
+		/** 법원 절차에서 들어오는 돈 (R52): 채무자 승인이 아니므로 소멸시효 중단으로 세지 않음 (R50) */
+		public boolean court() {
+			return this == AUCTION_DISTRIBUTION || this == COURT_DEPOSIT;
+		}
 	}
 
 	/**

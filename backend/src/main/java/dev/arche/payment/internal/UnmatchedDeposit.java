@@ -41,6 +41,13 @@ class UnmatchedDeposit extends BaseEntity {
 		this.matchedAt = now;
 	}
 
+	/** 여러 계약에 나눠 매칭 (R48) */
+	void split(long staffId, OffsetDateTime now) {
+		this.status = Status.SPLIT;
+		this.matchedBy = staffId;
+		this.matchedAt = now;
+	}
+
 	long paymentId() {
 		return paymentId;
 	}

@@ -60,6 +60,12 @@ class LimitationService {
 		LocalDate judgment = acq == null ? null : acq.judgmentConfirmedOn();
 		for (AccountEvent e : events.findByAccountIdOrderById(a.getId())) {
 			if (e.active() && e.type() == AccountEvent.Type.PAYMENT) {
+				if (e.limitationExcluded()) {
+					// 보증인·제3자·법원 배당 입금은 채무자의 승인이 아니다 (R50)
+					all.add(new LimitationInfo.Event(e.eventDate(), "PAYMENT", "제3자·법원 입금 (중단 미반영, R50)",
+							false));
+					continue;
+				}
 				boolean counted = start != null && e.eventDate().isAfter(start);
 				all.add(new LimitationInfo.Event(e.eventDate(), "PAYMENT", "일부 변제(승인)", counted));
 				if (counted) {
@@ -68,6 +74,11 @@ class LimitationService {
 			}
 		}
 		for (LimitationEvent e : limitationEvents.findByAccountIdOrderByEventDate(a.getId())) {
+			if (e.voided()) {
+				all.add(new LimitationInfo.Event(e.eventDate(), e.type().name(),
+						"[무효] " + (e.memo() == null ? "" : e.memo() + " — ") + e.voidReason(), false));
+				continue;
+			}
 			if (e.type() == LimitationEvent.Type.JUDGMENT_CONFIRMED) {
 				judgment = judgment == null || e.eventDate().isAfter(judgment) ? e.eventDate() : judgment;
 				all.add(new LimitationInfo.Event(e.eventDate(), e.type().name(), e.memo(), true));
@@ -88,7 +99,18 @@ class LimitationService {
 	}
 
 	@Transactional
-	void record(long accountId, LimitationEvent.Type type, LocalDate date, String memo) {
-		limitationEvents.save(new LimitationEvent(accountId, type, date, memo));
+	long record(long accountId, LimitationEvent.Type type, LocalDate date, String memo) {
+		return limitationEvents.save(new LimitationEvent(accountId, type, date, memo)).getId();
+	}
+
+	@Transactional
+	void voidEvent(long accountId, long eventId, LocalDate on, String reason) {
+		LimitationEvent e = limitationEvents.findById(eventId)
+				.filter(x -> x.accountId() == accountId)
+				.orElseThrow(() -> new dev.arche.common.BusinessException("LIMITATION_EVENT_NOT_FOUND",
+						"소멸시효 중단 기록이 없습니다"));
+		if (!e.voided()) {
+			e.voidOn(on, reason);
+		}
 	}
 }
