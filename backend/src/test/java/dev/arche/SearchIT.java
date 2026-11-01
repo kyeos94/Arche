@@ -3,8 +3,6 @@ package dev.arche;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.arche.support.IntegrationTest;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
@@ -48,6 +46,8 @@ class SearchIT extends IntegrationTest {
 	}
 
 	private JsonNode search(MockHttpSession session, String q) throws Exception {
-		return ok(getJson(session, "/api/loans/search?q=" + URLEncoder.encode(q, StandardCharsets.UTF_8)));
+		// MockMvc는 URL 템플릿을 다시 인코딩하므로 미리 인코딩하지 않고 파라미터로 넘긴다
+		return ok(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/loans/search")
+				.param("q", q).session(session)));
 	}
 }
