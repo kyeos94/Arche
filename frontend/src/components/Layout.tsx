@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth'
 import { NoteBadge } from '@/features/notes/NoteBadge'
+import { NotePopup } from '@/features/notes/NotePopup'
 import { formatDate } from '@/lib/format'
 import { THEME_LABEL, THEME_ORDER, setPreferences, toggleCollapsed, usePreferences } from '@/lib/preferences'
 import { cn } from '@/lib/utils'
@@ -73,6 +74,7 @@ export function Layout() {
           </Button>
         </div>
       </header>
+      <NotePopup />
       {top && <TopNav groups={groups} activeTo={active?.item.to} activeGroup={active?.group.key} />}
       <div className="flex flex-1">
         {!top && (

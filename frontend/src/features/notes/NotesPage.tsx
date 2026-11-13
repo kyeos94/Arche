@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { type InboxItem, type NoteRef, type SentItem, noteKeys, notes, refPath } from '@/api/notes'
 import { PagedList } from '@/components/Pagination'
 import { ErrorMessage } from '@/components/ui/alert'
@@ -16,8 +16,24 @@ type Box = 'inbox' | 'sent'
 
 /** 쪽지함 (R74): 받은 쪽지·보낸 쪽지 목록과 내용, 쪽지 쓰기·답장 */
 export function NotesPage() {
+  const [params, setParams] = useSearchParams()
   const [box, setBox] = useState<Box>('inbox')
   const [selected, setSelected] = useState<number | null>(null)
+  // 새 쪽지 팝업의 [열기]: /notes?open={id} 로 오면 그 쪽지를 고르고 주소에서는 지운다
+  const openParam = Number(params.get('open')) || null
+  const [handledOpen, setHandledOpen] = useState<number | null>(null)
+  if (openParam !== null && openParam !== handledOpen) {
+    setHandledOpen(openParam)
+    setBox('inbox')
+    setSelected(openParam)
+  }
+  if (openParam === null && handledOpen !== null) setHandledOpen(null)
+  useEffect(() => {
+    if (openParam === null) return
+    const next = new URLSearchParams(params)
+    next.delete('open')
+    setParams(next, { replace: true })
+  }, [openParam, params, setParams])
   const [compose, setCompose] = useState<ComposeInitial | null>(null)
   const inbox = useQuery({ queryKey: noteKeys.inbox, queryFn: notes.inbox, refetchInterval: 30_000 })
   const sent = useQuery({ queryKey: noteKeys.sent, queryFn: notes.sent, enabled: box === 'sent' })
