@@ -1,18 +1,98 @@
-# Arche — 대부 여신관리 시스템 (포트폴리오)
+# Arche — 대부 여신관리 시스템
 
-가상의 대부업체 **예시대부(가상)** 의 여신관리(계약·이자·입금·연체) 시스템입니다.
-범위는 "좁고 깊게" — 계약 하나의 돈 흐름(이자·입금·취소·연체)을 실무 예외까지 정확하게 만들고,
-나머지 업무는 뼈대 하나만 두거나 아래 확장 지점으로만 남깁니다.
+> 저축은행·대부업 여신 전산을 5년간 개발·운영하며 겪은 문제를 **Java 21 · Spring Boot 4 · Spring Modulith**로 다시 설계한 개인 프로젝트입니다.
+> 가상의 대부업체 **예시대부(가상)** 를 두고, 계약 하나의 돈 흐름(이자·입금·취소·연체)을 실무 예외까지 정확하게 만드는 데 집중했습니다.
+
+| 업무 모듈 | 테스트 메서드 | 계산 검증 사례 | 정책서 규칙 | 설계 결정 기록 |
+| :---: | :---: | :---: | :---: | :---: |
+| 17개 | 250개 | 28개 (G1~G28) | 75개 (R1~R75) | ADR 11개 |
+
+통합 테스트(Testcontainers)는 GitHub Actions에서 실행합니다. R39 이후 규칙은 정책서에 없던 부분을 직접 정한 것이라 "가정·검수 필요"로 표시했습니다.
+
+## 화면
+
+**입금 매칭 → 삭제 → 정정 이동** (G11 → G27 → G28) — 과거 입금을 바꾸면 그날부터 이자·연체를 다시 계산합니다.
+
+![입금 재계산](docs/media/payment-replay.gif)
+
+**추심 연락 7일 7회 한도** (G14) — 연락 기록은 남기되, 허용 여부는 매번 다시 판정합니다.
+
+![추심 한도](docs/media/collection-limit.gif)
+
+**주민등록번호·휴대폰번호 검색과 마스킹** — 원문은 암호화해 저장하고, 블라인드 인덱스로 일치 검색만 합니다.
+
+![검색과 마스킹](docs/media/search-masking.gif)
+
+> GIF는 업무일자를 2026-06-12에 고정해 녹화했습니다. 다시 녹화하는 방법은 [tools/demo-capture](tools/demo-capture/README.md)에 있습니다.
+
+## 현업에서 겪은 문제 → Arche의 설계
+
+| 실무에서 겪은 문제 | Arche에서 한 것 |
+| --- | --- |
+| 원 미만 절사 순서 때문에 중도상환수수료가 1원 어긋나고, 부동소수점 계산으로 금액이 한 단위 낮게 나옴 | 금액에 `double`·`float` 사용을 ArchUnit으로 금지. 절사 규칙(R2·R12)을 정책서에 고정하고 golden CSV 69행을 회차 단위로 대조 |
+| 소급 입금·입금 취소·정정 때마다 원장을 손으로 다시 맞춤 | 계약 조건 + 이벤트 목록을 하루씩 재생하는 **순수 함수 엔진** 하나로 모으고, 달라진 거래만 역분개 + 새 거래로 기록. 원장 UPDATE·DELETE는 DB 트리거로 차단 ([ADR 0002](docs/adr/0002-replay-engine.md)) |
+| 개인채무자보호법의 7일 7회 연락 제한·연락 유예 | 연락 기록은 저장하고 허용 판정은 입금 내역으로 매번 다시 계산. 자동 문자는 만들 때가 아니라 보내기 직전에 다시 판정 |
+| 기한이익상실 통지가 재처리 때 바뀌어 버림 | "그때 보낸 통지"는 저장된 사실로 엔진에 다시 넣어 재생이 바꾸지 못하게 함 |
+| 개인정보 분리보관·마스킹 요구 | 식별번호 필드 암호화(키 버전 관리) + 블라인드 인덱스 검색, 화면은 마스킹 값만, 원문 조회는 접근 기록 |
+| 레거시에서 화면·모듈이 서로의 DB를 직접 조회 | Spring Modulith 모듈 경계와 "다른 모듈 Repository 참조 금지"를 테스트로 강제. 신청 → 계약은 이벤트 발행 기록(Outbox)으로 연결 |
+| 서버 시계(`now()`)에 기대 계산해 재현이 안 됨 | 모든 계산은 업무일자 기준(R6), `LocalDate.now()` 사용을 테스트로 금지. 서버가 꺼졌던 날의 일마감은 기동 시 하루씩 따라잡음 |
+| 같은 계약에 입금이 동시에 들어오는 문제 | 계약 단위 행 잠금(`SELECT … FOR UPDATE`, R31) |
+
+## 구조
+
+```mermaid
+flowchart LR
+  subgraph 접수
+    O[origination<br/>신청·심사]
+  end
+  subgraph 계약·돈 흐름
+    S[servicing<br/>계약·재생 엔진·원장]
+    P[payment<br/>입금·매칭·정정]
+    C[collection<br/>연체·추심·소멸시효]
+  end
+  subgraph 운영
+    OP[operation<br/>일마감]
+    R[reporting<br/>보고서·엑셀]
+  end
+  I[integration<br/>외부 기관 포트 + Mock]
+  O == 대출 실행 이벤트(Outbox) ==> S
+  P -- 재생 입력 --> S
+  C -- 계약·소멸시효 조회 --> S
+  C -- 입금 내역 --> P
+  OP -- 일마감 --> S
+  OP --> C
+  OP --> P
+  OP --> R
+  R -- 잔액·원장 조회 --> S
+  R --> P
+  O -. 신용조회·본인인증 .-> I
+  P -. 가상계좌 .-> I
+  C -. 문자 .-> I
+```
+
+실선은 호출(의존) 방향, 굵은 선은 이벤트 발행 → 수신 방향입니다.
+
+그 밖의 모듈: calendar(영업일), product, customer, staff(권한), note, document, communication, collateral, creditinfo, treasury.
+외부 기관 연계(신용조회·신용정보 보고·본인인증·송금·문자·팩스·우편·담보 시세)는 모두 포트 + Mock 어댑터입니다.
+
+## 만든 방식과 AI 활용
+
+- **업무 규칙과 기대값을 먼저 고정:** 정책서(R1~R75)와 계산 검증 사례(G1~G28)를 먼저 정하고, 코드는 이 기대값을 맞추도록 작성했습니다.
+- **AI 코딩 도구(Claude Code)로 구현:** 구현과 테스트 코드 작성에 AI를 적극적으로 썼습니다.
+- **직접 한 것:** 실무 경험을 바탕으로 한 업무 규칙과 숫자 결정, 설계 방향(재생 엔진·모듈 경계·권한 행렬) 선택, golden 기대값 검수, ADR 승인, 정책서에 없는 규칙의 "가정" 판단.
+- **검증 장치:** AI가 만든 코드도 golden 대조·모듈 경계·권한표 테스트를 통과해야 합치도록 CI를 구성했습니다.
+
+## 문서
 
 | 문서 | 내용 |
 | --- | --- |
-| [docs/policy.md](docs/policy.md) | 가상 회사 정책서 — 모든 업무 규칙과 숫자 (R1~R68, R39 이후는 가정·검수 필요) |
-| [docs/golden-cases.md](docs/golden-cases.md) | 계산 검증 사례 G1~G28 — 테스트 기대값 |
-| [docs/guide.md](docs/guide.md) | 구현 가이드 — 설계 방향 |
+| [docs/policy.md](docs/policy.md) | 가상 회사 정책서: 모든 업무 규칙과 숫자 (R1~R75, R39 이후는 가정·검수 필요) |
+| [docs/golden-cases.md](docs/golden-cases.md) | 계산 검증 사례 G1~G28: 테스트 기대값 |
+| [docs/guide.md](docs/guide.md) | 구현 가이드: 설계 방향 |
 | [docs/mvp.md](docs/mvp.md) | MVP 범위 |
-| [docs/adr/](docs/adr/) | 설계 결정 기록 |
+| [docs/adr/](docs/adr/) | 설계 결정 기록 0001~0011 |
 
-## 기술 스택
+## 기술 스택 상세
 
 - 백엔드: Java 21, Spring Boot 4.1.2, Spring Modulith 2.1.1, Hibernate 7(JPA), Flyway, PostgreSQL 18 (패키지 `dev.arche`)
 - 락·세션·캐시: PostgreSQL 행 잠금(`FOR UPDATE`), 서블릿 세션, Caffeine, ShedLock JDBC
@@ -79,7 +159,7 @@ cd backend && ./gradlew integrationTest    # 통합: Testcontainers (CI)
 cd frontend && npm test
 ```
 
-- `GoldenScheduleTest`: [golden/schedules.csv](backend/src/test/resources/golden/schedules.csv) 65행(G1~G4, G20, G24, G25)을 회차 단위로 대조
+- `GoldenScheduleTest`: [golden/schedules.csv](backend/src/test/resources/golden/schedules.csv) 69행(G1~G4, G20, G23, G24, G25)을 회차 단위로 대조
 - `GoldenScenarioTest`·`PolicyRuleTest`: G5~G28, R3·R5·R9·R23·R29·R32·R33 등 정책 분기, 재생 결정성
 - `ArchitectureTest`: Spring Modulith 모듈 경계, 다른 모듈 Repository 참조 금지, `LocalDate.now()` 금지, double/float 금지, 엔진의 Spring·JPA 비의존
 - `SecurityIT`·`PaymentCorrectionIT`·`WorkoutIT`·`CollectionIT`·`DeferralMessageIT`·`IntegrationFlowsIT`: 연락 유예·자동 문자, G13·G14·G19 저장·판정, 채무조정 결재권·체결 거절(R23), 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단

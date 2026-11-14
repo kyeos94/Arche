@@ -1,0 +1,15 @@
+{
+  "name": "arche-demo-capture",
+  "private": true,
+  "type": "module",
+  "description": "README용 화면 GIF 녹화 (Playwright 녹화 → ffmpeg GIF 변환). 앱 코드와 분리",
+  "scripts": {
+    "capture": "tsx src/run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "playwright": "^1.65.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
