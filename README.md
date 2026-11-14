@@ -42,32 +42,32 @@
 
 ```mermaid
 flowchart LR
-  subgraph 접수
-    O[origination<br/>신청·심사]
+  subgraph intake["접수"]
+    O["origination<br/>신청·심사"]
   end
-  subgraph 계약·돈 흐름
-    S[servicing<br/>계약·재생 엔진·원장]
-    P[payment<br/>입금·매칭·정정]
-    C[collection<br/>연체·추심·소멸시효]
+  subgraph money["계약·돈 흐름"]
+    S["servicing<br/>계약·재생 엔진·원장"]
+    P["payment<br/>입금·매칭·정정"]
+    C["collection<br/>연체·추심·소멸시효"]
   end
-  subgraph 운영
-    OP[operation<br/>일마감]
-    R[reporting<br/>보고서·엑셀]
+  subgraph ops["운영"]
+    OP["operation<br/>일마감"]
+    R["reporting<br/>보고서·엑셀"]
   end
-  I[integration<br/>외부 기관 포트 + Mock]
-  O == 대출 실행 이벤트(Outbox) ==> S
-  P -- 재생 입력 --> S
-  C -- 계약·소멸시효 조회 --> S
-  C -- 입금 내역 --> P
-  OP -- 일마감 --> S
+  I["integration<br/>외부 기관 포트 + Mock"]
+  O ==>|"대출 실행 이벤트(Outbox)"| S
+  P -->|"재생 입력"| S
+  C -->|"계약·소멸시효 조회"| S
+  C -->|"입금 내역"| P
+  OP -->|"일마감"| S
   OP --> C
   OP --> P
   OP --> R
-  R -- 잔액·원장 조회 --> S
+  R -->|"잔액·원장 조회"| S
   R --> P
-  O -. 신용조회·본인인증 .-> I
-  P -. 가상계좌 .-> I
-  C -. 문자 .-> I
+  O -.->|"신용조회·본인인증"| I
+  P -.->|"가상계좌"| I
+  C -.->|"문자"| I
 ```
 
 실선은 호출(의존) 방향, 굵은 선은 이벤트 발행 → 수신 방향입니다.
