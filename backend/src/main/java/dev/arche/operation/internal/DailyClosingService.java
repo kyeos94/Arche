@@ -38,6 +38,10 @@ interface DailyClosingRepository extends JpaRepository<DailyClosing, Long> {
  * <li>업무일자 변경</li>
  * </ol>
  * 각 계약은 자체 트랜잭션으로 처리하므로, 중간에 실패해도 다시 실행하면 같은 결과가 된다(재생은 결정적).
+ * <p>
+ * 계약 단위 실패 격리 (R76, ADR 0012): ②~④에서 한 계약의 재생이 실패하면 그 계약만 롤백하고 실패 기록(daily_closing_failure)에
+ * 남긴 뒤 다음 계약을 계속한다. 실패가 있어도 ⑤ 대사 → 일보 스냅샷("미판정 계약 N건") → 업무일자 변경까지 진행한다.
+ * 실패한 계약은 asOf가 그대로라 다음 마감이나 재판정({@link ClosingFailureService#rejudge}) 때 결정적으로 따라잡는다.
  */
 @Service
 class DailyClosingService {
@@ -51,11 +55,12 @@ class DailyClosingService {
 	private final CollectionDaily collectionDaily;
 	private final StaffDirectory staff;
 	private final DailyReports reports;
+	private final ClosingFailureService failures;
 	private final Clock clock;
 
 	DailyClosingService(DailyClosingRepository closings, BusinessDates businessDates, LoanAccounts accounts,
 			Payments payments, CollectionDaily collectionDaily, StaffDirectory staff, DailyReports reports,
-			Clock clock) {
+			ClosingFailureService failures, Clock clock) {
 		this.closings = closings;
 		this.businessDates = businessDates;
 		this.accounts = accounts;
@@ -63,6 +68,7 @@ class DailyClosingService {
 		this.collectionDaily = collectionDaily;
 		this.staff = staff;
 		this.reports = reports;
+		this.failures = failures;
 		this.clock = clock;
 	}
 
@@ -84,17 +90,22 @@ class DailyClosingService {
 		}
 		Payments.DailyTotals totals = payments.totalsFor(d);
 		LoanAccounts.JudgeReport judged = accounts.judgeAll(d.plusDays(1));
+		int unjudged = failures.record(d, judged.failures());
+		if (unjudged > 0) {
+			log.error("일마감 {}: 판정 실패 계약 {}건은 롤백하고 마감을 계속합니다 (재판정 필요, R76): {}", d, unjudged,
+					judged.failures().stream().map(f -> f.accountId() + "[" + f.code() + "]").toList());
+		}
 		CollectionDaily.Report collection = collectionDaily.run(d.plusDays(1));
 		int mismatches = accounts.reconcile();
-		DailyReports.Snapshot report = reports.snapshot(d);
+		DailyReports.Snapshot report = reports.snapshot(d, unjudged);
 		DailyClosing closing = closings.save(new DailyClosing(d, OffsetDateTime.now(clock),
 				staff.currentIfAny().map(CurrentStaff::loginId).orElse("batch"), totals.allocatedTotal().won(),
 				totals.allocatedCount(), accounts.correctionsPostedOn(d).won(), totals.unmatchedOpenTotal().won(),
-				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches));
+				judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches, unjudged));
 		businessDates.advance(d);
-		log.info("일마감 {} 완료: 계약 {}건 판정, 신규 통지 {}, 상실 {}, 대사 불일치 {}, 추심 알림 {}·{}·{}, 자동 문자 {}건 예약,"
+		log.info("일마감 {} 완료: 계약 {}건 판정, 판정 실패 {}, 신규 통지 {}, 상실 {}, 대사 불일치 {}, 추심 알림 {}·{}·{}, 자동 문자 {}건 예약,"
 				+ " 일보 {}행(분개 차변 {} / 대변 {}, 미매핑 {}){}",
-				d, judged.accounts(), judged.newNotices(), judged.accelerations(), mismatches,
+				d, judged.accounts(), unjudged, judged.newNotices(), judged.accelerations(), mismatches,
 				collection.limitationAlerts(), collection.promiseMisses(), collection.promisesTerminated(),
 				collection.messagesScheduled(), report.lines(), report.journalDebit(), report.journalCredit(),
 				report.unmappedTypes(), report.monthEnd() ? ", 월마감" : "");

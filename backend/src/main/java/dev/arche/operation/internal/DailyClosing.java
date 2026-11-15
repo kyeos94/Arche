@@ -31,13 +31,15 @@ class DailyClosing {
 	private int newNotices;
 	private int accelerations;
 	private int mismatches;
+	/** 판정에 실패해 롤백된 계약 수 (R76) */
+	private int judgeFailures;
 
 	protected DailyClosing() {
 	}
 
 	DailyClosing(LocalDate businessDate, OffsetDateTime closedAt, String closedBy, long paymentTotal,
 			int paymentCount, long correctionTotal, long unmatchedTotal, int accountsJudged, int newNotices,
-			int accelerations, int mismatches) {
+			int accelerations, int mismatches, int judgeFailures) {
 		this.businessDate = businessDate;
 		this.closedAt = closedAt;
 		this.closedBy = closedBy;
@@ -49,6 +51,7 @@ class DailyClosing {
 		this.newNotices = newNotices;
 		this.accelerations = accelerations;
 		this.mismatches = mismatches;
+		this.judgeFailures = judgeFailures;
 	}
 
 	LocalDate businessDate() {
@@ -93,5 +96,9 @@ class DailyClosing {
 
 	int mismatches() {
 		return mismatches;
+	}
+
+	int judgeFailures() {
+		return judgeFailures;
 	}
 }

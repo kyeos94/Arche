@@ -35,7 +35,7 @@ class ReportService implements DailyReports {
 	 */
 	record DailyView(LocalDate businessDate, boolean closed, boolean balancesAvailable,
 			@Nullable OffsetDateTime snapshotAt, long journalDebit, long journalCredit, int unmappedCount,
-			List<DailyReportBuilder.Line> lines) {
+			int unjudgedCount, List<DailyReportBuilder.Line> lines) {
 	}
 
 	record JournalView(LocalDate businessDate, boolean closed, List<JournalMapper.Line> lines,
@@ -71,7 +71,7 @@ class ReportService implements DailyReports {
 
 	@Override
 	@Transactional
-	public Snapshot snapshot(LocalDate d) {
+	public Snapshot snapshot(LocalDate d, int unjudgedAccounts) {
 		List<LedgerLine> entries = servicing.ledgerPostedOn(d);
 		List<AccountBalance> balances = servicing.balances();
 		List<DailyReportBuilder.Line> lines = lines(d, entries, balances);
@@ -79,7 +79,7 @@ class ReportService implements DailyReports {
 		OffsetDateTime now = OffsetDateTime.now(clock);
 		String by = staff.currentIfAny().map(CurrentStaff::loginId).orElse("batch");
 		store.replaceDaily(new ReportStore.DailyHeader(d, now, by, journal.debit(), journal.credit(),
-				journal.unmapped().size()), lines, journal.totals());
+				journal.unmapped().size(), unjudgedAccounts), lines, journal.totals());
 		if (!journal.balanced()) {
 			log.warn("일보 {} 분개 차변 {} ≠ 대변 {}", d, journal.debit(), journal.credit());
 		}
@@ -125,14 +125,14 @@ class ReportService implements DailyReports {
 		if (snapshot.isPresent()) {
 			var h = snapshot.get();
 			return new DailyView(d, true, true, h.createdAt(), h.journalDebit(), h.journalCredit(), h.unmappedCount(),
-					store.dailyLines(d));
+					h.unjudgedCount(), store.dailyLines(d));
 		}
 		List<LedgerLine> entries = servicing.ledgerPostedOn(d);
 		JournalMapper.Day journal = new JournalMapper(store.rules()).day(entries);
 		boolean live = d.equals(today);
 		List<DailyReportBuilder.Line> lines = live ? lines(d, entries, servicing.balances())
 				: DailyReportBuilder.ledgerLines(d, entries);
-		return new DailyView(d, false, live, null, journal.debit(), journal.credit(), journal.unmapped().size(),
+		return new DailyView(d, false, live, null, journal.debit(), journal.credit(), journal.unmapped().size(), 0,
 				lines);
 	}
 

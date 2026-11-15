@@ -37,11 +37,12 @@ class ReportController {
 	}
 
 	record DailyDto(LocalDate businessDate, boolean closed, boolean balancesAvailable, OffsetDateTime snapshotAt,
-			long journalDebit, long journalCredit, boolean journalBalanced, int unmappedCount, List<LineDto> lines) {
+			long journalDebit, long journalCredit, boolean journalBalanced, int unmappedCount, int unjudgedCount,
+			List<LineDto> lines) {
 
 		static DailyDto of(ReportService.DailyView v) {
 			return new DailyDto(v.businessDate(), v.closed(), v.balancesAvailable(), v.snapshotAt(), v.journalDebit(),
-					v.journalCredit(), v.journalDebit() == v.journalCredit(), v.unmappedCount(),
+					v.journalCredit(), v.journalDebit() == v.journalCredit(), v.unmappedCount(), v.unjudgedCount(),
 					v.lines().stream().map(LineDto::of).toList());
 		}
 	}

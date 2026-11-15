@@ -11,8 +11,15 @@ public interface DailyReports {
 	 * 업무일자 D의 일보 스냅샷과 (D가 말일이면) 월마감 스냅샷을 저장한다.
 	 * 일마감 ⑤ 잔액 대사 직후, 마감 기록·⑥ 업무일자 변경 전에 호출한다. 호출자는 D가 아직 마감되지 않았음을 보장하며,
 	 * 같은 D의 스냅샷이 이미 있으면(마감 실패 후 재실행) 새로 쓴다.
+	 *
+	 * @param unjudgedAccounts 판정에 실패해 그날 기준으로 판정되지 않은 계약 수. 일보에 "미판정 계약 N건"으로 표시 (R76)
 	 */
-	Snapshot snapshot(LocalDate businessDate);
+	Snapshot snapshot(LocalDate businessDate, int unjudgedAccounts);
+
+	/** 판정 실패 계약이 없는 마감 */
+	default Snapshot snapshot(LocalDate businessDate) {
+		return snapshot(businessDate, 0);
+	}
 
 	record Snapshot(LocalDate businessDate, int lines, long journalDebit, long journalCredit, int unmappedTypes,
 			boolean monthEnd) {

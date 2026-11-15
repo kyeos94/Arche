@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 class ReportStore {
 
 	record DailyHeader(LocalDate businessDate, OffsetDateTime createdAt, String createdBy, long journalDebit,
-			long journalCredit, int unmappedCount) {
+			long journalCredit, int unmappedCount, int unjudgedCount) {
 	}
 
 	record MonthHeader(LocalDate month, LocalDate asOf, OffsetDateTime createdAt) {
@@ -88,10 +88,10 @@ class ReportStore {
 		jdbc.sql("delete from report_daily where business_date = :d").param("d", h.businessDate()).update();
 		jdbc.sql("""
 				insert into report_daily (business_date, created_at, created_by, journal_debit, journal_credit,
-				  unmapped_count) values (:d, :at, :by, :debit, :credit, :unmapped)
+				  unmapped_count, unjudged_count) values (:d, :at, :by, :debit, :credit, :unmapped, :unjudged)
 				""").param("d", h.businessDate()).param("at", h.createdAt()).param("by", h.createdBy())
 				.param("debit", h.journalDebit()).param("credit", h.journalCredit()).param("unmapped", h.unmappedCount())
-				.update();
+				.param("unjudged", h.unjudgedCount()).update();
 		for (DailyReportBuilder.Line l : lines) {
 			jdbc.sql("""
 					insert into report_daily_line (business_date, section, item, item_count, amount)
@@ -112,7 +112,8 @@ class ReportStore {
 		return jdbc.sql("select * from report_daily where business_date = :d").param("d", d)
 				.query((rs, n) -> new DailyHeader(rs.getObject("business_date", LocalDate.class),
 						rs.getObject("created_at", OffsetDateTime.class), rs.getString("created_by"),
-						rs.getLong("journal_debit"), rs.getLong("journal_credit"), rs.getInt("unmapped_count")))
+						rs.getLong("journal_debit"), rs.getLong("journal_credit"), rs.getInt("unmapped_count"),
+						rs.getInt("unjudged_count")))
 				.optional();
 	}
 
