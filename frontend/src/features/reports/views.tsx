@@ -61,6 +61,9 @@ export function DailyReportView({ data }: { data: DailyReport }) {
         {data.unmappedCount > 0 && (
           <Badge className="border-red-200 bg-red-50 text-red-700">미매핑 거래유형 {data.unmappedCount}</Badge>
         )}
+        {data.unjudgedCount > 0 && (
+          <Badge className="border-red-200 bg-red-50 text-red-700">미판정 계약 {data.unjudgedCount}건</Badge>
+        )}
       </div>
       {!data.balancesAvailable && (
         <Alert tone="warn">이 날은 보고서 기능 도입 전에 마감되어 잔액·상태·연체 구간 스냅샷이 없습니다. 원장 거래 행만 보여 줍니다.</Alert>

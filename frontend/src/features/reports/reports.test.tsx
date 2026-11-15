@@ -47,6 +47,7 @@ const daily: DailyReport = {
   journalCredit: 11_135_616,
   journalBalanced: true,
   unmappedCount: 0,
+  unjudgedCount: 0,
   lines: [
     { section: 'POSTING', sectionLabel: '원장 거래유형별 (순액)', item: 'REPAYMENT', label: '입금 충당', count: 1, amount: 1_135_616 },
     { section: 'DISBURSEMENT', sectionLabel: '실행·양수', item: 'DISBURSE', label: '실행', count: 1, amount: 10_000_000 },

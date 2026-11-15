@@ -1,17 +1,104 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { endpoints, queryKeys } from '@/api/endpoints'
 import { PagedList } from '@/components/Pagination'
 import { Alert, ErrorMessage } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { useAuth } from '@/features/auth/auth'
 import { EmptyRow, SortTH, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { usePaging } from '@/lib/usePaging'
 import { useSort } from '@/lib/useSort'
 
+/** 마감일의 판정 실패 계약과 재판정 (R76). 재판정은 시스템관리자만 */
+function ClosingFailures({ businessDate, onClose }: { businessDate: string; onClose: () => void }) {
+  const client = useQueryClient()
+  const { can } = useAuth()
+  const failures = useQuery({
+    queryKey: queryKeys.closingFailures(businessDate),
+    queryFn: () => endpoints.closingFailures(businessDate),
+  })
+  const rejudge = useMutation({
+    mutationFn: endpoints.rejudge,
+    onSuccess: async () => {
+      await client.invalidateQueries()
+    },
+  })
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="max-w-3xl"
+        title={`${formatDate(businessDate)} 판정 실패 계약`}
+        description="실패한 계약은 그 계약만 롤백되고 마감은 계속됐습니다. 데이터를 고친 뒤 재판정하면 현재 업무일자까지 다시 재생합니다. (R76)"
+      >
+        <ErrorMessage error={failures.error ?? rejudge.error} />
+        {rejudge.data && (
+          <Alert tone="success">
+            {rejudge.data.accountNo} 재판정 완료 (상태 {rejudge.data.status})
+          </Alert>
+        )}
+        <Table>
+          <THead>
+            <TR>
+              <TH>계약번호</TH>
+              <TH>오류</TH>
+              <TH>해결 여부</TH>
+              <TH />
+            </TR>
+          </THead>
+          <TBody>
+            {failures.data?.length === 0 && <EmptyRow colSpan={4} />}
+            {failures.data?.map((f) => (
+              <TR key={f.id}>
+                <TD>
+                  <Link to={`/loans/${f.accountId}`} className="text-primary hover:underline">
+                    {f.accountNo}
+                  </Link>
+                </TD>
+                <TD>
+                  <div className="flex items-center gap-1">
+                    <Badge>{f.kind === 'BUSINESS' ? '업무 규칙' : '시스템'}</Badge>
+                    <span className="font-mono text-xs">{f.code}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{f.message}</div>
+                </TD>
+                <TD>
+                  {f.resolved ? (
+                    <span>
+                      해결 <span className="text-xs text-muted-foreground">{formatDateTime(f.resolvedAt)} · {f.resolvedBy}</span>
+                    </span>
+                  ) : (
+                    <span className="text-destructive">미해결</span>
+                  )}
+                </TD>
+                <TD className="text-right">
+                  {!f.resolved && can('admin.manage') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={rejudge.isPending}
+                      onClick={() => rejudge.mutate(f.accountId)}
+                    >
+                      재판정
+                    </Button>
+                  )}
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function Closing() {
   const client = useQueryClient()
+  const [failuresOf, setFailuresOf] = useState<string | null>(null)
   const bd = useQuery({ queryKey: queryKeys.businessDate, queryFn: endpoints.businessDate })
   const closings = useQuery({ queryKey: queryKeys.closings, queryFn: endpoints.closings })
   const close = useMutation({
@@ -29,6 +116,7 @@ function Closing() {
     correctionTotal: (c) => c.correctionTotal,
     unmatchedTotal: (c) => c.unmatchedTotal,
     accountsJudged: (c) => c.accountsJudged,
+    judgeFailures: (c) => c.judgeFailures,
     newNotices: (c) => c.newNotices,
     accelerations: (c) => c.accelerations,
     mismatches: (c) => c.mismatches,
@@ -51,7 +139,7 @@ function Closing() {
       <CardContent className="space-y-2">
         <p className="text-xs text-muted-foreground">
           순서: ① 당일 입금 충당 → ② 약정일 가수금 충당 → ③ 연체 판정 → ④ 기한이익상실 판정 → ⑤ 잔액 대사 → ⑥ 업무일자
-          변경 (R24)
+          변경 (R24). ②~④에서 판정에 실패한 계약은 그 계약만 롤백하고 마감을 계속합니다(판정 실패 수를 누르면 재판정, R76).
         </p>
         <ErrorMessage error={close.error ?? dispatch.error} />
         <div className="flex items-center gap-2">
@@ -66,7 +154,8 @@ function Closing() {
         {close.data && (
           <Alert tone="success">
             {close.data.businessDate} 마감 완료 → 업무일자 {formatDate(close.data.nextBusinessDate)} · 판정{' '}
-            {close.data.accountsJudged}건 · 새 통지 {close.data.newNotices} · 상실 {close.data.accelerations} · 대사 불일치{' '}
+            {close.data.accountsJudged}건
+            {close.data.judgeFailures > 0 && ` · 판정 실패 ${close.data.judgeFailures}건(재판정 필요)`} · 새 통지 {close.data.newNotices} · 상실 {close.data.accelerations} · 대사 불일치{' '}
             {close.data.mismatches}
           </Alert>
         )}
@@ -91,6 +180,9 @@ function Closing() {
                 <SortTH {...header('accountsJudged')} className="text-right">
                   판정
                 </SortTH>
+                <SortTH {...header('judgeFailures')} className="text-right">
+                  판정 실패
+                </SortTH>
                 <SortTH {...header('newNotices')} className="text-right">
                   새 통지
                 </SortTH>
@@ -103,7 +195,7 @@ function Closing() {
               </TR>
             </THead>
             <TBody>
-              {closings.data?.length === 0 && <EmptyRow colSpan={10} />}
+              {closings.data?.length === 0 && <EmptyRow colSpan={11} />}
               {paging.rows.map((c) => (
                 <TR key={c.businessDate}>
                   <TD>{formatDate(c.businessDate)}</TD>
@@ -113,6 +205,20 @@ function Closing() {
                   <TD className="num">{formatMoney(c.correctionTotal)}</TD>
                   <TD className="num">{formatMoney(c.unmatchedTotal)}</TD>
                   <TD className="num">{formatNumber(c.accountsJudged)}</TD>
+                  <TD className="num">
+                    {c.judgeFailures > 0 ? (
+                      <button
+                        type="button"
+                        className="font-semibold text-destructive underline"
+                        aria-label={`${c.businessDate} 판정 실패 ${c.judgeFailures}건 보기`}
+                        onClick={() => setFailuresOf(c.businessDate)}
+                      >
+                        {formatNumber(c.judgeFailures)}
+                      </button>
+                    ) : (
+                      formatNumber(c.judgeFailures)
+                    )}
+                  </TD>
                   <TD className="num">{formatNumber(c.newNotices)}</TD>
                   <TD className="num">{formatNumber(c.accelerations)}</TD>
                   <TD className={c.mismatches > 0 ? 'num text-destructive' : 'num'}>{formatNumber(c.mismatches)}</TD>
@@ -121,6 +227,7 @@ function Closing() {
             </TBody>
           </Table>
         </PagedList>
+        {failuresOf && <ClosingFailures businessDate={failuresOf} onClose={() => setFailuresOf(null)} />}
       </CardContent>
     </Card>
   )

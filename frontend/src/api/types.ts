@@ -510,7 +510,30 @@ export interface ClosingResult {
   newNotices: number
   accelerations: number
   mismatches: number
+  /** 판정에 실패해 롤백된 계약 수 (R76) */
+  judgeFailures: number
   nextBusinessDate?: string
+}
+
+/** 일마감 판정 실패 계약 (R76). kind: BUSINESS = 업무 규칙 위반, SYSTEM = 그 밖의 오류 */
+export interface ClosingFailure {
+  id: number
+  businessDate: string
+  accountId: number
+  accountNo: string
+  kind: 'BUSINESS' | 'SYSTEM'
+  code: string
+  message: string
+  recordedAt: string
+  resolved: boolean
+  resolvedAt: string | null
+  resolvedBy: string | null
+}
+
+export interface RejudgeResult {
+  accountId: number
+  accountNo: string
+  status: string
 }
 
 export interface StaffRow {

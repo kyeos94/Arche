@@ -19,6 +19,8 @@ export interface DailyReport {
   journalCredit: number
   journalBalanced: boolean
   unmappedCount: number
+  /** 일마감에서 판정에 실패해 그날 기준으로 판정되지 않은 계약 수 (R76) */
+  unjudgedCount: number
   lines: ReportLine[]
 }
 

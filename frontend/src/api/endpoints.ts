@@ -6,6 +6,7 @@ import type {
   AccountRef,
   BulkJob,
   BusinessDateInfo,
+  ClosingFailure,
   ClosingResult,
   Correction,
   CorrectionType,
@@ -38,6 +39,7 @@ import type {
   LegalActionType,
   LegalCostType,
   PayerType,
+  RejudgeResult,
   SplitMethod,
   SplitPart,
   SplitResult,
@@ -69,6 +71,7 @@ export const queryKeys = {
   corrections: (status: string) => ['corrections', status] as const,
   bulkJob: (id: number) => ['bulk', id] as const,
   closings: ['closings'] as const,
+  closingFailures: (businessDate: string) => ['closings', businessDate, 'failures'] as const,
   staff: ['admin', 'staff'] as const,
   accessLogs: ['admin', 'access-logs'] as const,
   products: ['products'] as const,
@@ -262,6 +265,9 @@ export const endpoints = {
 
   close: () => api.post<ClosingResult>('/api/operation/closings'),
   closings: () => api.get<ClosingResult[]>('/api/operation/closings'),
+  closingFailures: (businessDate: string) =>
+    api.get<ClosingFailure[]>(`/api/operation/closings/${businessDate}/failures`),
+  rejudge: (accountId: number) => api.post<RejudgeResult>(`/api/operation/accounts/${accountId}/rejudge`),
   staff: () => api.get<StaffRow[]>('/api/admin/staff'),
   unlockStaff: (id: number) => api.post<void>(`/api/admin/staff/${id}/unlock`),
   accessLogs: () => api.get<AccessLogRow[]>('/api/admin/access-logs'),
