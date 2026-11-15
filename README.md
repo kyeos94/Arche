@@ -5,9 +5,9 @@
 
 | 업무 모듈 | 테스트 메서드 | 계산 검증 사례 | 정책서 규칙 | 설계 결정 기록 |
 | :---: | :---: | :---: | :---: | :---: |
-| 17개 | 250개 | 28개 (G1~G28) | 75개 (R1~R75) | ADR 11개 |
+| 17개 | 257개 | 28개 (G1~G28) | 76개 (R1~R76) | ADR 12개 |
 
-통합 테스트(Testcontainers)는 GitHub Actions에서 실행합니다. R39 이후 규칙은 정책서에 없던 부분을 직접 정한 것이라 "가정·검수 필요"로 표시했습니다.
+통합 테스트(Testcontainers)는 GitHub Actions에서 실행합니다. R39~R75는 정책서에 없던 부분을 직접 정한 것이라 "가정·검수 필요"로 표시했습니다(R76은 확정 규칙).
 
 ## 화면
 
@@ -77,7 +77,7 @@ flowchart LR
 
 ## 만든 방식과 AI 활용
 
-- **업무 규칙과 기대값을 먼저 고정:** 정책서(R1~R75)와 계산 검증 사례(G1~G28)를 먼저 정하고, 코드는 이 기대값을 맞추도록 작성했습니다.
+- **업무 규칙과 기대값을 먼저 고정:** 정책서(R1~R76)와 계산 검증 사례(G1~G28)를 먼저 정하고, 코드는 이 기대값을 맞추도록 작성했습니다.
 - **AI 코딩 도구(Claude Code)로 구현:** 구현과 테스트 코드 작성에 AI를 적극적으로 썼습니다.
 - **직접 한 것:** 실무 경험을 바탕으로 한 업무 규칙과 숫자 결정, 설계 방향(재생 엔진·모듈 경계·권한 행렬) 선택, golden 기대값 검수, ADR 승인, 정책서에 없는 규칙의 "가정" 판단.
 - **검증 장치:** AI가 만든 코드도 golden 대조·모듈 경계·권한표 테스트를 통과해야 합치도록 CI를 구성했습니다.
@@ -86,7 +86,7 @@ flowchart LR
 
 | 문서 | 내용 |
 | --- | --- |
-| [docs/policy.md](docs/policy.md) | 가상 회사 정책서: 모든 업무 규칙과 숫자 (R1~R75, R39 이후는 가정·검수 필요) |
+| [docs/policy.md](docs/policy.md) | 가상 회사 정책서: 모든 업무 규칙과 숫자 (R1~R76, R39~R75는 가정·검수 필요) |
 | [docs/golden-cases.md](docs/golden-cases.md) | 계산 검증 사례 G1~G28: 테스트 기대값 |
 | [docs/guide.md](docs/guide.md) | 구현 가이드: 설계 방향 |
 | [docs/mvp.md](docs/mvp.md) | MVP 범위 |
@@ -124,7 +124,9 @@ cd frontend && ARCHE_WEB_PORT=5174 ARCHE_API_URL=http://localhost:8081 npm run d
 ### 데모
 
 모든 계산의 기준일은 업무일자입니다(R6). 업무일자는 매일 23:00 일마감이 다음 날로 넘기고, 서버가 꺼져 있어 마감이 빠졌으면
-**기동할 때 밀린 일마감을 하루씩 처리해 오늘로 맞춥니다**(연체·상실·알림 판정을 건너뛰지 않음). 데모 데이터는 2026-06-12 기준으로
+**기동할 때 밀린 일마감을 하루씩 처리해 오늘로 맞춥니다**(연체·상실·알림 판정을 건너뛰지 않음).
+일마감 중 계약 하나의 재생이 실패해도 그 계약만 되돌리고 마감을 끝까지 진행하며, 실패 계약은 운영 관리 > 일마감 이력의 '판정 실패'에서
+데이터를 고친 뒤 재판정합니다(R76, [ADR 0012](docs/adr/0012-closing-failure-isolation.md)). 데모 데이터는 2026-06-12 기준으로
 만들어지므로 첫 기동 때 오늘까지 따라잡습니다. golden 사례 G11·G27·G28을 문서 값 그대로 화면에서 재현하려면 `ARCHE_CATCH_UP=false`로
 2026-06-12에 고정한 뒤, 시스템관리자의 일마감으로 하루씩 넘기세요.
 데모 직원은 모두 비밀번호 `arche1234!`입니다.
@@ -162,6 +164,7 @@ cd frontend && npm test
 - `GoldenScheduleTest`: [golden/schedules.csv](backend/src/test/resources/golden/schedules.csv) 69행(G1~G4, G20, G23, G24, G25)을 회차 단위로 대조
 - `GoldenScenarioTest`·`PolicyRuleTest`: G5~G28, R3·R5·R9·R23·R29·R32·R33 등 정책 분기, 재생 결정성
 - `ArchitectureTest`: Spring Modulith 모듈 경계, 다른 모듈 Repository 참조 금지, `LocalDate.now()` 금지, double/float 금지, 엔진의 Spring·JPA 비의존
+- `JudgeRunTest`·`DailyClosingIT`: 일마감 계약 단위 실패 격리(R76) — 실패 계약만 롤백, 마감·업무일자 진행, 실패 기록, 재판정 후 대조 계약과 같은 결과, 재판정 권한
 - `SecurityIT`·`PaymentCorrectionIT`·`WorkoutIT`·`CollectionIT`·`DeferralMessageIT`·`IntegrationFlowsIT`: 연락 유예·자동 문자, G13·G14·G19 저장·판정, 채무조정 결재권·체결 거절(R23), 권한표 허용·차단, G11→G27→G28 REST 흐름, 웹훅 중복 통지, 1,000행 일괄 등록, 신청→계약 이관, 원장 UPDATE·DELETE 차단
 
 ## 진행 기록 — 무엇을 왜 이렇게 만들었나
@@ -186,6 +189,10 @@ cd frontend && npm test
    완제 안내)을 만들어 두고, 발송기가 연락 가능 시간 안에서 발송 직전에 7일 7회·연락 유예·소멸시효·약속 이행 여부를 다시 본다.
    밤사이 입금으로 연체가 풀리면 연체 문자는 건너뛴다. 실제 발송은 `MessagingPort` Mock 어댑터가 로그만 남긴다.
 8. **권한표를 코드 행렬로** ([ADR 0004](docs/adr/0004-security.md)) — 정책서 9.1 표를 `Permission` enum으로 옮기고, 표 자체를 테스트 데이터로 대조한다.
+9. **일마감은 계약 하나 때문에 멈추지 않는다** ([ADR 0012](docs/adr/0012-closing-failure-isolation.md), R76) — 실무에서 매입 데이터 한 건의
+   오입력으로 마감 일배치 전체가 돌지 않은 장애를 겪었다. 계약마다 트랜잭션을 나눠 실패한 계약만 롤백하고 실패 기록(추가만, 해결 표시만 허용)을
+   남긴 뒤 대사·일보·업무일자 변경까지 진행한다. 실패 계약은 재생 기준일이 그대로라, 데이터를 고친 뒤 재판정하면 결정적 재생으로 다른 계약과
+   같은 기준에 맞춰진다(`DailyClosingIT`가 같은 입금의 대조 계약과 결과가 같은지 확인).
 
 ## mvp.md 5장 기능 (가정·검수 필요)
 
