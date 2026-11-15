@@ -116,6 +116,7 @@ class AccountReplayer {
 				paymentByRef.put(e.ref(), e.paymentId());
 			}
 			if (e.active()) {
+				requireOnOrAfterStart(e, terms.disbursedOn());
 				engineEvents.add(e.toEngine());
 			}
 		}
@@ -133,6 +134,18 @@ class AccountReplayer {
 		int created = saveNotices(a.getId(), r.notices(), noticeRows);
 		return new Outcome(r, created, !wasAccelerated && r.acceleratedOn() != null, ledgerCounts[0],
 				ledgerCounts[1]);
+	}
+
+	/**
+	 * 재생 입력 무결성 (R76). 엔진은 실행(양수)일부터 하루씩 진행하므로 그보다 이른 이벤트는 조용히 빠진다. 입력 단계에서 막는
+	 * 규칙(입금 PAYMENT_DATE_INVALID 등)을 거치지 않고 들어온 데이터(이관·직접 수정)를 조용히 버리지 않고 오류로 드러낸다.
+	 * 일마감에서는 그 계약만 실패로 기록된다.
+	 */
+	static void requireOnOrAfterStart(AccountEvent e, LocalDate start) {
+		if (e.eventDate().isBefore(start)) {
+			throw new IllegalStateException("재생 입력 오류: 이벤트 " + e.ref() + "(" + e.type() + ")의 날짜 " + e.eventDate()
+					+ "이 실행(양수)일 " + start + "보다 이릅니다");
+		}
 	}
 
 	private void saveInstallments(long accountId, SimulationResult r) {

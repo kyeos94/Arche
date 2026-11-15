@@ -70,8 +70,32 @@ public interface LoanAccounts {
 	/** 처리일 일보의 "정정" 항목: 이 업무일자에 등록된 과거 기산일 정정 역분개 합계 (R28) */
 	Money correctionsPostedOn(LocalDate businessDate);
 
-	record JudgeReport(int accounts, int newNotices, int accelerations) {
+	/**
+	 * 일마감 판정 결과. accounts는 판정에 성공한 계약 수이고, 실패한 계약은 failures에만 있다 (R76).
+	 */
+	record JudgeReport(int accounts, int newNotices, int accelerations, java.util.List<JudgeFailure> failures) {
+
+		public JudgeReport {
+			failures = java.util.List.copyOf(failures);
+		}
 	}
+
+	/**
+	 * 판정에 실패한 계약 (R76). 업무 규칙 위반(BusinessException)이면 kind BUSINESS·code는 오류 코드, 그 밖의 예외면
+	 * kind SYSTEM·code는 예외 클래스 이름. message는 첫 줄 200자 요약
+	 */
+	record JudgeFailure(long accountId, Kind kind, String code, String message) {
+
+		public enum Kind {
+			BUSINESS, SYSTEM
+		}
+	}
+
+	/**
+	 * 재판정 (R76): 계약 하나를 현재 업무일자까지 재생해 연체·상실을 판정한다. 계약 락 안에서 처리하며, 재생이 실패하면 예외를 그대로
+	 * 던진다(아무것도 바뀌지 않음).
+	 */
+	AccountRef rejudge(long accountId);
 
 	/** 유효한 입금 (취소 제외). 은행 거래일자 기준 */
 	record PaymentRecord(LocalDate bankDate, Money amount) {

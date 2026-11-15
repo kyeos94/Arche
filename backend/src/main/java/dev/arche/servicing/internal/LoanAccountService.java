@@ -437,19 +437,24 @@ class LoanAccountService implements LoanAccounts {
 
 	@Override
 	public JudgeReport judgeAll(LocalDate nextDate) {
-		int count = 0;
-		int notices = 0;
-		int accelerations = 0;
-		for (Long id : accounts.findIdsToJudge(nextDate)) {
-			AccountReplayer.Outcome o = perAccount.execute(status -> {
-				LoanAccount a = lock(id);
-				return replayer.replay(a, replayer.terms(a), nextDate, nextDate, null);
-			});
-			count++;
-			notices += o.newNotices();
-			accelerations += o.newlyAccelerated() ? 1 : 0;
-		}
-		return new JudgeReport(count, notices, accelerations);
+		// 계약마다 자기 트랜잭션. 실패한 계약은 롤백되어 asOf가 그대로 남고, 다음 마감이나 재판정 때 결정적으로 따라잡는다 (R76)
+		return JudgeRun.run(accounts.findIdsToJudge(nextDate), id -> perAccount.execute(status -> {
+			LoanAccount a = lock(id);
+			AccountReplayer.Outcome o = replayer.replay(a, replayer.terms(a), nextDate, nextDate, null);
+			return new JudgeRun.Judged(o.newNotices(), o.newlyAccelerated());
+		}));
+	}
+
+	/**
+	 * 재판정 (R76): 일마감에서 실패한 계약 하나를 현재 업무일자까지 재생한다. 일마감 D가 다른 계약을 D+1(= 마감 후 업무일자)로
+	 * 판정하므로, 업무일자로 재생하면 다른 계약과 같은 기준이 된다. 같은 계약의 동시 재판정은 계약 락으로 줄을 세운다.
+	 */
+	@Override
+	@Transactional
+	public AccountRef rejudge(long accountId) {
+		LoanAccount a = lock(accountId);
+		replay(a, null);
+		return ref(a);
 	}
 
 	@Override
